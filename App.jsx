@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 const LS_PREFIX = "epicerieRepas:";
-const DEFAULT_SETTINGS = { backendUrl: "https://picerie-repas-backend.onrender.com", phone1: "", phone2: "", phone3: "", phone4: "", schoolHoursEnabled: true, schoolStartHour: 8, schoolEndHour: 15, taskNotifyChannel: "both" };
+const DEFAULT_SETTINGS = { phone1: "", phone2: "", phone3: "", phone4: "", schoolHoursEnabled: true, schoolStartHour: 8, schoolEndHour: 15, taskNotifyChannel: "both" };
 
 const AISLES = [
   { id: "fruits-legumes", name: "Fruits & légumes", color: "#6B9B5E" },
@@ -212,7 +212,7 @@ const SEED_MEALS = [
 const MEMBER_COLORS = ["#6B9B5E", "#6B8CA8", "#A6634A", "#C98A2B", "#8C6A9B", "#4E8C97"];
 const TASK_FREQUENCIES = { unique: "Une fois", quotidien: "Chaque jour", hebdomadaire: "Chaque semaine", auxDeuxSemaines: "Aux 2 semaines" };
 
-const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`);
 
 function resizeImage(file, maxW = 900, quality = 0.72) {
   return new Promise((resolve, reject) => {
@@ -252,42 +252,104 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
   return outputArray;
 }
-const cleanBackendUrl = (url) => (url || "").trim().replace(/\/+$/, "");
-
 function lsGet(key, fallback) {
   try { const v = localStorage.getItem(LS_PREFIX + key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
 function lsSet(key, value) {
   try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); } catch (e) { console.error("Erreur de sauvegarde locale", e); }
 }
-async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+
+// ============================================================
+// Couche d'accès à Supabase — remplace complètement l'ancien
+// backend Express. La sécurité (quelle famille voit quoi) est
+// gérée automatiquement par les règles RLS de la base de données,
+// pas par le code ici — on n'a jamais besoin de filtrer par famille
+// manuellement dans les requêtes de lecture.
+// ============================================================
+
+// Retrouve la famille de l'utilisateur connecté — nécessaire pour
+// savoir quel family_id inscrire sur chaque nouvelle ligne.
+async function getMyFamilyId() {
+  const { data, error } = await supabase.from("family_users").select("family_id").limit(1).single();
+  if (error) { console.error("Erreur récupération famille:", error.message); return null; }
+  return data?.family_id || null;
+}
+
+const snakeToCamel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+const camelToSnake = (s) => s.replace(/[A-Z]/g, (c) => "_" + c.toLowerCase());
+function rowToCamel(row) {
+  if (!row) return row;
+  const out = {};
+  for (const k of Object.keys(row)) out[snakeToCamel(k)] = row[k];
+  return out;
+}
+function objToSnake(obj) {
+  const out = {};
+  for (const k of Object.keys(obj)) out[camelToSnake(k)] = obj[k];
+  return out;
+}
+
+// Charge une table Supabase en entier (déjà filtrée par famille grâce
+// à RLS) et convertit chaque ligne en camelCase pour l'app.
+async function loadTable(table, orderBy) {
+  let query = supabase.from(table).select("*");
+  if (orderBy) query = query.order(orderBy, { ascending: true });
+  const { data, error } = await query;
+  if (error) { console.error(`Erreur chargement ${table}:`, error.message); return []; }
+  return (data || []).map(rowToCamel);
+}
+
+async function insertRow(table, familyId, obj) {
+  const payload = objToSnake({ ...obj, familyId });
+  const { data, error } = await supabase.from(table).insert(payload).select().single();
+  if (error) { console.error(`Erreur ajout ${table}:`, error.message); return null; }
+  return rowToCamel(data);
+}
+async function updateRow(table, id, patch) {
+  const payload = objToSnake(patch);
+  const { error } = await supabase.from(table).update(payload).eq("id", id);
+  if (error) { console.error(`Erreur modification ${table}:`, error.message); return false; }
+  return true;
+}
+async function deleteRow(table, id) {
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) { console.error(`Erreur suppression ${table}:`, error.message); return false; }
+  return true;
+}
+async function upsertSettings(familyId, patch) {
+  const payload = objToSnake({ ...patch, familyId });
+  const { error } = await supabase.from("settings").upsert(payload, { onConflict: "family_id" });
+  if (error) { console.error("Erreur sauvegarde réglages:", error.message); return false; }
+  return true;
+}
+
+// Compare l'ancien tableau au nouveau et n'envoie à Supabase que ce qui a
+// vraiment changé (ajouts, modifications, suppressions) — ça évite de devoir
+// réécrire chacune des dizaines de fonctions qui ajoutent/modifient/suppriment
+// un article, une tâche, etc. dans le reste de l'app.
+async function syncArrayDiff(table, prevArr, nextArr, familyId) {
+  const prevById = new Map(prevArr.map(x => [x.id, x]));
+  const nextIds = new Set(nextArr.map(x => x.id));
+
+  for (const item of prevArr) {
+    if (!nextIds.has(item.id)) await deleteRow(table, item.id);
+  }
+  for (const item of nextArr) {
+    const prevItem = prevById.get(item.id);
+    if (!prevItem) {
+      await insertRow(table, familyId, item);
+    } else if (JSON.stringify(prevItem) !== JSON.stringify(item)) {
+      await updateRow(table, item.id, item);
+    }
   }
 }
-async function pullFromBackend(backendUrl) {
-  const url = cleanBackendUrl(backendUrl);
-  if (!url) return null;
-  try {
-    const res = await fetchWithTimeout(`${url}/api/sync`);
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.success ? json.data : null;
-  } catch { return null; }
-}
-async function pushToBackend(backendUrl, payload) {
-  const url = cleanBackendUrl(backendUrl);
-  if (!url) return false;
-  try {
-    const res = await fetchWithTimeout(`${url}/api/sync`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const json = await res.json();
-    return !!json.success;
-  } catch { return false; }
-}
+
+// ⚠️ TEMPORAIRE : les notifications (SMS, push) ne sont pas encore branchées à
+// Supabase — ça demande un petit service séparé (Edge Function) qu'on construira
+// à une prochaine étape. Ces fonctions évitent que l'app plante en attendant,
+// mais aucun SMS ni notification ne part réellement pour l'instant.
+const cleanBackendUrl = () => "";
+async function pushToBackend() { return false; }
 
 function todayStr() {
   const d = new Date();
@@ -376,55 +438,43 @@ function App({ session }) {
   const tapCountRef = useRef({ count: 0, last: 0 });
   const lastLocalWriteRef = useRef(0);
 
-  const loadAll = useCallback(async (opts = {}) => {
-    const s = { ...DEFAULT_SETTINGS, ...lsGet("settings", DEFAULT_SETTINGS) };
-    let gi = lsGet("groceryItems", []);
-    let mi = lsGet("mealIdeas", null);
-    if (mi === null) mi = SEED_MEALS.map(m => ({ id: uid(), ...m }));
-    let wp = lsGet("weekPlan", []);
-    let mb = lsGet("members", []);
-    let tk = lsGet("tasks", []);
-    let rc = lsGet("rewardCharts", []);
+  const [familyId, setFamilyId] = useState(null);
 
-    const recentLocalWrite = Date.now() - lastLocalWriteRef.current < 8000;
-    if (s.backendUrl && !(recentLocalWrite && !opts.force)) {
-      const remote = await pullFromBackend(s.backendUrl);
-      if (remote) {
-        // Une liste vide côté serveur ne doit jamais remplacer des données locales
-        // déjà présentes — sinon un appareil qui n'a pas encore poussé ses propres
-        // changements effacerait tout en "synchronisant".
-        gi = (remote.groceryItems && remote.groceryItems.length) ? remote.groceryItems : gi;
-        mi = (remote.mealIdeas && remote.mealIdeas.length) ? remote.mealIdeas : mi;
-        wp = (remote.weekPlan && remote.weekPlan.length) ? remote.weekPlan : wp;
-        mb = (remote.members && remote.members.length) ? remote.members : mb;
-        tk = (remote.tasks && remote.tasks.length) ? remote.tasks : tk;
-        rc = (remote.rewardCharts && remote.rewardCharts.length) ? remote.rewardCharts : rc;
-        // "myMemberId" ne doit jamais venir du serveur — c'est propre à cet
-        // appareil. On l'ignore explicitement au cas où une ancienne donnée
-        // (avant ce correctif) en contiendrait encore un dans les réglages partagés.
-        if (remote.settings) { const { myMemberId: _ignored, ...cleanRemoteSettings } = remote.settings; Object.assign(s, cleanRemoteSettings); }
-        lsSet("groceryItems", gi); lsSet("mealIdeas", mi); lsSet("weekPlan", wp);
-        lsSet("members", mb); lsSet("tasks", tk); lsSet("rewardCharts", rc); lsSet("settings", s);
-      }
+  const loadAll = useCallback(async () => {
+    const famId = await getMyFamilyId();
+    setFamilyId(famId);
+    if (!famId) { setLoaded(true); return; }
+
+    const [gi, mi0, wp, mb, tk, rc, settingsRes] = await Promise.all([
+      loadTable("grocery_items"),
+      loadTable("meal_ideas"),
+      loadTable("week_plan"),
+      loadTable("members"),
+      loadTable("tasks"),
+      loadTable("reward_charts"),
+      supabase.from("settings").select("*").eq("family_id", famId).maybeSingle(),
+    ]);
+
+    let mi = mi0;
+    if (mi.length === 0) {
+      // Première ouverture pour cette famille : on amorce avec les idées de
+      // repas suggérées, une seule fois.
+      const seeded = SEED_MEALS.map(m => ({ id: uid(), ...m }));
+      for (const meal of seeded) await insertRow("meal_ideas", famId, meal);
+      mi = seeded;
     }
+
+    const remoteSettings = settingsRes?.data ? rowToCamel(settingsRes.data) : {};
+    const { familyId: _fid, updatedAt: _ua, ...cleanSettings } = remoteSettings;
+    const s = { ...DEFAULT_SETTINGS, ...cleanSettings };
+
     setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc); setSettings(s);
+    lsSet("settings", s);
     setLoaded(true);
   }, []);
 
-  // Au démarrage, si un envoi précédent avait échoué (ex. serveur trop lent), on
-  // le réessaie tout de suite, AVANT le premier chargement — pour que ce
-  // changement ne soit jamais silencieusement écrasé par les données du serveur.
-  const flushPendingSync = async () => {
-    const pending = lsGet("pendingSync", null);
-    if (!pending || !pending.merged || !pending.backendUrl) return;
-    const ok = await pushToBackend(pending.backendUrl, pending.merged);
-    if (ok) lsSet("pendingSync", null);
-  };
-
   useEffect(() => {
-    flushPendingSync().finally(() => {
-      loadAll();
-    });
+    loadAll();
     const interval = setInterval(() => loadAll(), 30000);
     const onFocus = () => loadAll();
     window.addEventListener("focus", onFocus);
@@ -432,100 +482,52 @@ function App({ session }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Réabonnement silencieux : le serveur peut occasionnellement perdre les
-  // abonnements aux notifications (ex. redémarrage du service gratuit). Si cet
-  // appareil a déjà la permission et sait qui il est, on renvoie discrètement
-  // l'abonnement au serveur à chaque ouverture — sans redemander la permission,
-  // pour que ça se répare tout seul sans que l'enfant ait à y penser.
-  useEffect(() => {
-    if (!loaded || !myMemberId || !settings.backendUrl) return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    (async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (!reg) return;
-        const sub = await reg.pushManager.getSubscription();
-        if (!sub) return; // jamais activé sur cet appareil, rien à réenregistrer
-        await fetch(`${cleanBackendUrl(settings.backendUrl)}/api/push/subscribe`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memberId: myMemberId, subscription: sub }),
-        });
-      } catch { /* silencieux — pas grave si ça échoue, on réessaiera à la prochaine ouverture */ }
-    })();
-  }, [loaded, myMemberId, settings.backendUrl]);
+  // Note : les notifications (SMS et push) ne sont pas encore branchées dans ce
+  // nouveau produit — elles demanderont un petit service séparé (Edge Function
+  // Supabase) qu'on construira à une prochaine étape.
 
   // Avant de pousser un changement, on va d'abord chercher la version la plus
   // fraîche du serveur pour les AUTRES champs — pour ne jamais écraser un
   // changement récent fait par un autre appareil (ex. une tâche cochée pendant
   // qu'un autre appareil ajoutait un article) simplement parce que notre copie
   // locale de ce champ-là était un peu dépassée.
-  const syncToBackend = async (next) => {
-    lastLocalWriteRef.current = Date.now();
-    const backendUrl = (next.settings || settings).backendUrl;
-    if (!backendUrl) return;
+  const persistGrocery = (next) => { syncArrayDiff("grocery_items", groceryItems, next, familyId); setGroceryItems(next); lsSet("groceryItems", next); };
+  const persistMeals = (next) => { syncArrayDiff("meal_ideas", mealIdeas, next, familyId); setMealIdeas(next); lsSet("mealIdeas", next); };
+  const persistPlan = (next) => { syncArrayDiff("week_plan", weekPlan, next, familyId); setWeekPlan(next); lsSet("weekPlan", next); };
+  const persistMembers = (next) => { syncArrayDiff("members", members, next, familyId); setMembers(next); lsSet("members", next); };
+  const persistTasks = (next) => { syncArrayDiff("tasks", tasks, next, familyId); setTasks(next); lsSet("tasks", next); };
+  const persistRewardCharts = (next) => { syncArrayDiff("reward_charts", rewardCharts, next, familyId); setRewardCharts(next); lsSet("rewardCharts", next); };
 
-    const remote = await pullFromBackend(backendUrl);
-    const base = remote || { groceryItems, mealIdeas, weekPlan, members, tasks, rewardCharts, settings };
-
-    const merged = {
-      groceryItems: next.groceryItems || base.groceryItems || groceryItems,
-      mealIdeas: next.mealIdeas || base.mealIdeas || mealIdeas,
-      weekPlan: next.weekPlan || base.weekPlan || weekPlan,
-      members: next.members || base.members || members,
-      tasks: next.tasks || base.tasks || tasks,
-      rewardCharts: next.rewardCharts || base.rewardCharts || rewardCharts,
-      settings: next.settings || base.settings || settings,
-    };
-
-    // Réessaie jusqu'à 3 fois (avec une petite pause) avant d'abandonner — le
-    // serveur gratuit est parfois juste lent, pas vraiment en panne.
-    let ok = false;
-    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
-      ok = await pushToBackend(backendUrl, merged);
-    }
+  const persistSettings = async (next) => {
+    setSettings(next);
+    lsSet("settings", next);
+    if (!familyId) return;
+    const ok = await upsertSettings(familyId, next);
     setSaveErr(!ok);
-    lastLocalWriteRef.current = Date.now();
-
-    if (ok) {
-      lsSet("pendingSync", null);
-    } else {
-      // Toujours pas réussi après 3 essais : on garde ce changement en mémoire
-      // pour le réessayer automatiquement à la prochaine ouverture de l'app,
-      // avant même d'aller chercher les données du serveur — pour ne jamais le
-      // perdre silencieusement.
-      lsSet("pendingSync", { backendUrl, merged, savedAt: Date.now() });
-    }
-
-    // On adopte aussi localement les champs qu'on n'était pas en train de modifier,
-    // pour que cet appareil reflète tout de suite ce qui vient d'être fusionné.
-    if (remote) {
-      if (!next.groceryItems && remote.groceryItems && remote.groceryItems.length) { setGroceryItems(remote.groceryItems); lsSet("groceryItems", remote.groceryItems); }
-      if (!next.mealIdeas && remote.mealIdeas && remote.mealIdeas.length) { setMealIdeas(remote.mealIdeas); lsSet("mealIdeas", remote.mealIdeas); }
-      if (!next.weekPlan && remote.weekPlan && remote.weekPlan.length) { setWeekPlan(remote.weekPlan); lsSet("weekPlan", remote.weekPlan); }
-      if (!next.members && remote.members && remote.members.length) { setMembers(remote.members); lsSet("members", remote.members); }
-      if (!next.tasks && remote.tasks && remote.tasks.length) { setTasks(remote.tasks); lsSet("tasks", remote.tasks); }
-      if (!next.rewardCharts && remote.rewardCharts && remote.rewardCharts.length) { setRewardCharts(remote.rewardCharts); lsSet("rewardCharts", remote.rewardCharts); }
-    }
   };
 
-  // Renvoie tout ce que cet appareil a en mémoire locale vers le serveur — utile si
-  // le serveur a perdu ses données (ex. redémarrage) après que cet appareil ait
-  // ajouté des choses : ça les remet en ligne pour que les autres les reçoivent.
+  // Renvoie tout ce que cet appareil a en mémoire locale vers Supabase — utile
+  // si un import de sauvegarde a laissé les choses dans un état incohérent.
   const forcePushAll = async () => {
-    if (!settings.backendUrl) return false;
-    return pushToBackend(settings.backendUrl, { groceryItems, mealIdeas, weekPlan, members, tasks, rewardCharts, settings });
+    if (!familyId) return false;
+    await syncArrayDiff("grocery_items", [], groceryItems, familyId);
+    await syncArrayDiff("meal_ideas", [], mealIdeas, familyId);
+    await syncArrayDiff("week_plan", [], weekPlan, familyId);
+    await syncArrayDiff("members", [], members, familyId);
+    await syncArrayDiff("tasks", [], tasks, familyId);
+    await syncArrayDiff("reward_charts", [], rewardCharts, familyId);
+    return true;
   };
 
   // Sauvegarde locale : un vrai fichier sur l'appareil, indépendant du serveur —
-  // filet de sécurité supplémentaire en cas de perte de données côté Render.
+  // filet de sécurité supplémentaire.
   const exportBackup = () => {
     const data = { groceryItems, mealIdeas, weekPlan, members, tasks, rewardCharts, settings, exportedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `epicerie-repas-sauvegarde-${todayStr()}.json`;
+    a.download = `sauvegarde-${todayStr()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -535,7 +537,8 @@ function App({ session }) {
       const text = await file.text();
       const data = JSON.parse(text);
       if (!data || typeof data !== "object") throw new Error("format invalide");
-      if (!window.confirm("Remplacer toutes les données actuelles (sur cet appareil et le serveur) par celles de ce fichier de sauvegarde? Cette action ne peut pas être annulée.")) return false;
+      if (!window.confirm("Remplacer toutes les données actuelles par celles de ce fichier de sauvegarde? Cette action ne peut pas être annulée.")) return false;
+      if (!familyId) return false;
 
       const gi = data.groceryItems || [];
       const mi = data.mealIdeas || [];
@@ -544,15 +547,14 @@ function App({ session }) {
       const tk = data.tasks || [];
       const rc = data.rewardCharts || [];
 
-      setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc);
-      lsSet("groceryItems", gi); lsSet("mealIdeas", mi); lsSet("weekPlan", wp); lsSet("members", mb); lsSet("tasks", tk); lsSet("rewardCharts", rc);
+      await syncArrayDiff("grocery_items", groceryItems, gi, familyId);
+      await syncArrayDiff("meal_ideas", mealIdeas, mi, familyId);
+      await syncArrayDiff("week_plan", weekPlan, wp, familyId);
+      await syncArrayDiff("members", members, mb, familyId);
+      await syncArrayDiff("tasks", tasks, tk, familyId);
+      await syncArrayDiff("reward_charts", rewardCharts, rc, familyId);
 
-      if (settings.backendUrl) {
-        await pushToBackend(settings.backendUrl, {
-          groceryItems: gi, mealIdeas: mi, weekPlan: wp, members: mb, tasks: tk, rewardCharts: rc, settings,
-          resetFields: ["groceryItems", "mealIdeas", "weekPlan", "members", "tasks", "rewardCharts"],
-        });
-      }
+      setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc);
       return true;
     } catch {
       window.alert("Ce fichier n'est pas une sauvegarde valide.");
@@ -560,48 +562,6 @@ function App({ session }) {
     }
   };
 
-  // Regroupe les appuis rapprochés (ex. cocher plusieurs étapes de routine coup sur
-  // coup) en un seul envoi réseau, plutôt que d'en déclencher un par appui — sinon,
-  // des envois indépendants pouvaient se dépasser l'un l'autre et le dernier arrivé
-  // écrasait parfois le tout dernier changement (l'étape "revenait non faite").
-  // L'affichage local, lui, reste instantané à chaque appui.
-  const persistTimersRef = useRef({});
-  const debouncedSync = (key, payload) => {
-    if (persistTimersRef.current[key]) clearTimeout(persistTimersRef.current[key]);
-    persistTimersRef.current[key] = setTimeout(() => { syncToBackend(payload); }, 500);
-  };
-
-  const persistGrocery = (next) => { setGroceryItems(next); lsSet("groceryItems", next); debouncedSync("groceryItems", { groceryItems: next }); };
-  const persistMeals = (next) => { setMealIdeas(next); lsSet("mealIdeas", next); debouncedSync("mealIdeas", { mealIdeas: next }); };
-  const persistPlan = (next) => { setWeekPlan(next); lsSet("weekPlan", next); debouncedSync("weekPlan", { weekPlan: next }); };
-  const persistMembers = (next) => { setMembers(next); lsSet("members", next); debouncedSync("members", { members: next }); };
-  const persistTasks = (next) => { setTasks(next); lsSet("tasks", next); debouncedSync("tasks", { tasks: next }); };
-  const persistRewardCharts = (next) => { setRewardCharts(next); lsSet("rewardCharts", next); debouncedSync("rewardCharts", { rewardCharts: next }); };
-
-  // Voir Carnet familial : on tire les données du serveur avant de pousser quoi que ce
-  // soit, pour ne jamais écraser les vraies données avec un état local vide.
-  const persistSettings = async (next) => {
-    lsSet("settings", next);
-    setSettings(next);
-    if (!next.backendUrl) return;
-
-    const remote = await pullFromBackend(next.backendUrl);
-    if (remote) {
-      const gi = (remote.groceryItems && remote.groceryItems.length) ? remote.groceryItems : groceryItems;
-      const mi = (remote.mealIdeas && remote.mealIdeas.length) ? remote.mealIdeas : mealIdeas;
-      const wp = (remote.weekPlan && remote.weekPlan.length) ? remote.weekPlan : weekPlan;
-      const mb = (remote.members && remote.members.length) ? remote.members : members;
-      const tk = (remote.tasks && remote.tasks.length) ? remote.tasks : tasks;
-      const rc = (remote.rewardCharts && remote.rewardCharts.length) ? remote.rewardCharts : rewardCharts;
-      setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc);
-      lsSet("groceryItems", gi); lsSet("mealIdeas", mi); lsSet("weekPlan", wp); lsSet("members", mb); lsSet("tasks", tk); lsSet("rewardCharts", rc);
-      const ok = await pushToBackend(next.backendUrl, { groceryItems: gi, mealIdeas: mi, weekPlan: wp, members: mb, tasks: tk, rewardCharts: rc, settings: next });
-      setSaveErr(!ok);
-    } else {
-      const ok = await pushToBackend(next.backendUrl, { groceryItems, mealIdeas, weekPlan, members, tasks, rewardCharts, settings: next });
-      setSaveErr(!ok);
-    }
-  };
 
   const addMember = (name, phone, kidMode) => persistMembers([...members, { id: uid(), name, phone: phone || "", kidMode: !!kidMode, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length] }]);
   const updateMember = (id, patch) => persistMembers(members.map(m => m.id === id ? { ...m, ...patch } : m));
@@ -638,14 +598,9 @@ function App({ session }) {
     }
   };
 
-  const notifyTurn = (task, nextMember) => {
-    if (nextMember && settings.backendUrl) {
-      fetch(`${cleanBackendUrl(settings.backendUrl)}/api/sms/notify-turn`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memberId: nextMember.id, memberName: nextMember.name, memberPhone: nextMember.phone || "", taskTitle: task.title, notifyParent: !!task.notifyParent }),
-      }).catch(() => { /* silencieux — la tâche a quand même changé de tour */ });
-    }
+  const notifyTurn = () => {
+    // Note : l'alerte de changement de tour sera rebranchée avec les
+    // notifications à la prochaine étape (Edge Function Supabase).
   };
 
   const rotateTask = (task) => {
@@ -766,21 +721,10 @@ function App({ session }) {
 
   const setDayPlan = (date, patch) => {
     const exists = weekPlan.find(p => p.date === date);
-    const next = exists ? weekPlan.map(p => p.date === date ? { ...p, ...patch } : p) : [...weekPlan, { date, mealIdeaId: null, customTitle: null, ...patch }];
+    const next = exists ? weekPlan.map(p => p.date === date ? { ...p, ...patch } : p) : [...weekPlan, { id: uid(), date, mealIdeaId: null, customTitle: null, ...patch }];
     persistPlan(next);
-
-    // Avertit la famille par SMS quand un repas est ajouté (pas quand on l'efface).
-    const title = patch.customTitle || (patch.mealIdeaId ? mealById(patch.mealIdeaId)?.title : null);
-    if (title && settings.backendUrl) {
-      const phones = [settings.phone1, settings.phone2, settings.phone3, settings.phone4].map(p => (p || "").trim()).filter(Boolean);
-      if (phones.length > 0) {
-        const dayLabel = new Date(date + "T00:00:00").toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "short" });
-        fetch(`${cleanBackendUrl(settings.backendUrl)}/api/sms/notify-menu`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dayLabel, title, phones }),
-        }).catch(() => { /* silencieux — le menu est quand même enregistré */ });
-      }
-    }
+    // Note : l'alerte SMS quand un repas est ajouté sera rebranchée avec les
+    // notifications à la prochaine étape (Edge Function Supabase).
   };
   const clearDayPlan = (date) => persistPlan(weekPlan.filter(p => p.date !== date));
 
