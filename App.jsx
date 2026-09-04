@@ -285,7 +285,12 @@ function rowToCamel(row) {
 }
 function objToSnake(obj) {
   const out = {};
-  for (const k of Object.keys(obj)) out[camelToSnake(k)] = obj[k];
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    // Postgres refuse une chaîne vide "" pour une colonne de type date ou uuid
+    // (ex. dueDate, turnStartDate, assignedTo non choisi) — mais accepte null.
+    out[camelToSnake(k)] = v === "" ? null : v;
+  }
   return out;
 }
 
