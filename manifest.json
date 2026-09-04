@@ -1,0 +1,13 @@
+{
+  "name": "Repas, tâches et routine",
+  "short_name": "Repas & Routine",
+  "description": "Liste d'épicerie, idées de repas, plan de la semaine, tâches et routines familiales",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EDF1E7",
+  "theme_color": "#C98A2B",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
