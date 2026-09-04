@@ -598,9 +598,11 @@ function App({ session }) {
     }
   };
 
-  const notifyTurn = () => {
-    // Note : l'alerte de changement de tour sera rebranchée avec les
-    // notifications à la prochaine étape (Edge Function Supabase).
+  const notifyTurn = (task, nextMember) => {
+    if (!nextMember || !familyId) return;
+    supabase.functions.invoke("notify", {
+      body: { action: "send", familyId, memberId: nextMember.id, title: "🔄 C'est ton tour!", body: `${nextMember.name}, c'est ton tour pour "${task.title}"!`, notifyParent: !!task.notifyParent },
+    }).catch(() => { /* silencieux — la tâche a quand même changé de tour */ });
   };
 
   const rotateTask = (task) => {
@@ -723,8 +725,13 @@ function App({ session }) {
     const exists = weekPlan.find(p => p.date === date);
     const next = exists ? weekPlan.map(p => p.date === date ? { ...p, ...patch } : p) : [...weekPlan, { id: uid(), date, mealIdeaId: null, customTitle: null, ...patch }];
     persistPlan(next);
-    // Note : l'alerte SMS quand un repas est ajouté sera rebranchée avec les
-    // notifications à la prochaine étape (Edge Function Supabase).
+
+    const title = patch.customTitle || (patch.mealIdeaId ? mealById(patch.mealIdeaId)?.title : null);
+    if (title && familyId) {
+      const dayLabel = new Date(date + "T00:00:00").toLocaleDateString("fr-CA", { weekday: "long", day: "numeric", month: "short" });
+      supabase.functions.invoke("notify", { body: { action: "broadcast", familyId, body: `🍽️ Menu ajouté — ${dayLabel} : ${title}` } })
+        .catch(() => { /* silencieux — le menu est quand même enregistré */ });
+    }
   };
   const clearDayPlan = (date) => persistPlan(weekPlan.filter(p => p.date !== date));
 
@@ -1801,7 +1808,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
   const enablePushForMember = async () => {
     if (!myMemberId) { setPushStatus("❌ Choisissez d'abord un membre."); return; }
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) { setPushStatus("❌ Non supporté sur ce navigateur/appareil."); return; }
-    if (!form.backendUrl) { setPushStatus("❌ Configurez d'abord l'adresse du backend."); return; }
     setPushBusy(true); setPushStatus("");
     try {
       const permission = await Notification.requestPermission();
@@ -1810,16 +1816,13 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
       const reg = await navigator.serviceWorker.register("/sw.js");
       await navigator.serviceWorker.ready;
 
-      const keyRes = await fetch(`${cleanBackendUrl(form.backendUrl)}/api/push/vapid-public-key`);
-      const keyData = await keyRes.json();
-      if (!keyData.publicKey) { setPushStatus("❌ Le backend n'a pas de clé de notification configurée."); setPushBusy(false); return; }
+      const { data: keyData } = await supabase.functions.invoke("notify", { body: { action: "vapid-public-key" } });
+      if (!keyData?.publicKey) { setPushStatus("❌ Les notifications ne sont pas encore configurées côté serveur."); setPushBusy(false); return; }
 
       let sub = await reg.pushManager.getSubscription();
       if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyData.publicKey) });
 
-      await fetch(`${cleanBackendUrl(form.backendUrl)}/api/push/subscribe`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId: myMemberId, subscription: sub }),
-      });
+      await supabase.functions.invoke("notify", { body: { action: "subscribe", memberId: myMemberId, subscription: sub } });
       const memberName = members.find(m => m.id === myMemberId)?.name;
       setPushStatus(`✅ Notifications activées sur cet appareil pour ${memberName}!`);
     } catch { setPushStatus("❌ Impossible d'activer les notifications sur cet appareil."); }
@@ -1830,12 +1833,9 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
     if (!myMemberId) return;
     setPushStatus("Envoi du test…");
     try {
-      const res = await fetch(`${cleanBackendUrl(form.backendUrl)}/api/push/test`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberId: myMemberId }),
-      });
-      const data = await res.json();
-      setPushStatus(data.success ? `✅ Notification de test envoyée (${data.sent} appareil(s)).` : "❌ Aucun appareil abonné pour ce membre, ou échec.");
-    } catch { setPushStatus("❌ Impossible de joindre le backend."); }
+      const { data } = await supabase.functions.invoke("notify", { body: { action: "test", memberId: myMemberId } });
+      setPushStatus(data?.success ? `✅ Notification de test envoyée (${data.pushSent} appareil(s)).` : "❌ Aucun appareil abonné pour ce membre, ou échec.");
+    } catch { setPushStatus("❌ Impossible de joindre le serveur de notifications."); }
   };
 
   // Pour un appareil de parent : retire complètement cet appareil des notifications
@@ -1848,11 +1848,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         if (reg) {
           const sub = await reg.pushManager.getSubscription();
           if (sub) {
-            if (form.backendUrl) {
-              await fetch(`${cleanBackendUrl(form.backendUrl)}/api/push/unsubscribe`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }),
-              });
-            }
+            await supabase.functions.invoke("notify", { body: { action: "unsubscribe", endpoint: sub.endpoint } });
             await sub.unsubscribe();
           }
         }
