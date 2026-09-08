@@ -413,6 +413,61 @@ const ROUTINE_EMOJIS = ["🪥", "🪮", "🚿", "🛁", "🧼", "🧴", "👕", 
 
 const COLORS = { paper: "#EDF1E7", card: "#FBF9F3", ink: "#2B2A22", accent: "#C98A2B", accentDark: "#A96F1E", muted: "#767159", danger: "#A6634A" };
 
+// Lance le paiement Stripe pour le plan choisi, et redirige vers la page de
+// paiement hébergée par Stripe.
+async function startCheckout(plan, setBusy, setError) {
+  setBusy(true); setError("");
+  try {
+    const { data, error } = await supabase.functions.invoke("create-checkout-session", { body: { plan } });
+    if (error || !data?.url) throw new Error(data?.error || "Impossible de démarrer le paiement.");
+    window.location.href = data.url;
+  } catch (err) {
+    setError(err.message);
+    setBusy(false);
+  }
+}
+async function openBillingPortal(setBusy, setError) {
+  setBusy(true); setError("");
+  try {
+    const { data, error } = await supabase.functions.invoke("create-portal-session", { body: {} });
+    if (error || !data?.url) throw new Error(data?.error || "Impossible d'ouvrir la gestion de l'abonnement.");
+    window.location.href = data.url;
+  } catch (err) {
+    setError(err.message);
+    setBusy(false);
+  }
+}
+
+function Paywall({ familyInfo }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#EAE2CB", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 420, background: "#F7F3E3", borderRadius: 16, padding: 32, textAlign: "center", border: "1px solid #D8D2BE" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⏰</div>
+        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, marginTop: 0, marginBottom: 8 }}>Votre essai gratuit est terminé</h1>
+        <p style={{ fontSize: 14, color: "#7A7256", marginBottom: 24 }}>
+          Abonnez-vous pour continuer à utiliser votre épicerie, vos repas, vos tâches et vos routines familiales.
+        </p>
+        {error && <p style={{ color: "#B5715F", fontSize: 13, marginBottom: 14 }}>{error}</p>}
+        <button disabled={busy} onClick={() => startCheckout("monthly", setBusy, setError)} style={{
+          width: "100%", padding: "13px 16px", borderRadius: 8, border: "none", background: "#8A6423",
+          color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 10, opacity: busy ? 0.6 : 1,
+        }}>S'abonner — mensuel</button>
+        <button disabled={busy} onClick={() => startCheckout("annual", setBusy, setError)} style={{
+          width: "100%", padding: "13px 16px", borderRadius: 8, border: "1.5px solid #8A6423", background: "transparent",
+          color: "#8A6423", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: busy ? 0.6 : 1,
+        }}>S'abonner — annuel (meilleure valeur)</button>
+        <p style={{ fontSize: 12, color: "#7A7256", marginTop: 18 }}>
+          Vous serez redirigé vers une page de paiement sécurisée. Vos données vous attendent, elles ne sont pas perdues.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
 function App({ session }) {
   const [loaded, setLoaded] = useState(false);
   const [groceryItems, setGroceryItems] = useState([]);
@@ -444,13 +499,14 @@ function App({ session }) {
   const lastLocalWriteRef = useRef(0);
 
   const [familyId, setFamilyId] = useState(null);
+  const [familyInfo, setFamilyInfo] = useState(null); // { subscriptionStatus, trialEndsAt, plan, stripeCustomerId }
 
   const loadAll = useCallback(async () => {
     const famId = await getMyFamilyId();
     setFamilyId(famId);
     if (!famId) { setLoaded(true); return; }
 
-    const [gi, mi0, wp, mb, tk, rc, settingsRes] = await Promise.all([
+    const [gi, mi0, wp, mb, tk, rc, settingsRes, familyRes] = await Promise.all([
       loadTable("grocery_items"),
       loadTable("meal_ideas"),
       loadTable("week_plan"),
@@ -458,7 +514,9 @@ function App({ session }) {
       loadTable("tasks"),
       loadTable("reward_charts"),
       supabase.from("settings").select("*").eq("family_id", famId).maybeSingle(),
+      supabase.from("families").select("*").eq("id", famId).single(),
     ]);
+    if (familyRes?.data) setFamilyInfo(rowToCamel(familyRes.data));
 
     let mi = mi0;
     if (mi.length === 0) {
@@ -796,6 +854,12 @@ function App({ session }) {
     );
   }
 
+  const trialExpired = familyInfo?.trialEndsAt && new Date(familyInfo.trialEndsAt) < new Date();
+  const isActive = familyInfo?.subscriptionStatus === "active";
+  if (trialExpired && !isActive) {
+    return <Paywall familyInfo={familyInfo} />;
+  }
+
   return (
     <div style={pageStyle}>
       <style>{`
@@ -884,7 +948,7 @@ function App({ session }) {
             onDeleteReward={deleteRewardChart} onMarkNight={markRewardNight} onUndoNight={undoRewardNight} onSetReward={setRewardChoice} />
         )}
         {tab === "params" && (
-          <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} />
+          <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} familyInfo={familyInfo} />
         )}
       </main>
 
@@ -1800,7 +1864,9 @@ function Card({ title, children: c }) {
   );
 }
 
-function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, myMemberId, setMyMemberId, onExport, onImport, session }) {
+function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, myMemberId, setMyMemberId, onExport, onImport, session, familyInfo }) {
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState("");
   const [form, setForm] = useState(settings);
   const [testResult, setTestResult] = useState("");
   const [syncResult, setSyncResult] = useState("");
@@ -2083,6 +2149,41 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </button>
       </Card>
 
+      <Card title="Abonnement">
+        {familyInfo?.subscriptionStatus === "active" ? (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
+              ✅ Abonnement actif ({familyInfo.plan === "annual" ? "annuel" : "mensuel"})
+            </p>
+            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={outlineBtn}>
+              Gérer mon abonnement
+            </button>
+          </>
+        ) : familyInfo?.subscriptionStatus === "past_due" ? (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.danger, marginTop: 0, marginBottom: 12 }}>
+              ⚠️ Le dernier paiement a échoué — mettez votre carte à jour pour éviter une interruption.
+            </p>
+            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={primaryBtn}>
+              Mettre à jour mon moyen de paiement
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
+              {familyInfo?.trialEndsAt && new Date(familyInfo.trialEndsAt) > new Date()
+                ? `🕐 Essai gratuit — se termine le ${new Date(familyInfo.trialEndsAt).toLocaleDateString("fr-CA")}`
+                : "Votre essai est terminé."}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError)} style={primaryBtn}>S'abonner — mensuel</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError)} style={outlineBtn}>S'abonner — annuel</button>
+            </div>
+          </>
+        )}
+        {billingError && <p style={{ color: COLORS.danger, fontSize: 12.5, marginTop: 10 }}>{billingError}</p>}
+      </Card>
+
       <Card title="Sauvegarde locale">
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Un fichier de sauvegarde téléchargé sur cet appareil, indépendant du serveur — un filet de sécurité supplémentaire. Faites-en une de temps en temps, surtout après avoir bâti une routine ou un défi récompense.
@@ -2361,14 +2462,14 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
         title: title.trim(), type: "chore", rotation, rotationIndex: task?.rotationIndex || 0, turnStartDate: task?.turnStartDate || todayStr(),
         rotationAuto: rotationAuto || null,
         rotationDayOfWeek: rotationAuto === "hebdomadaire" && rotationDayOfWeek !== "" ? Number(rotationDayOfWeek) : null,
-        assignedTo: null, frequency: null, dueDate: "", dueDayOfWeek: null, notifyParent, steps: null,
+        assignedTo: null, frequency: null, dueDate: "", dueDayOfWeek: null, notifyParent, steps: [],
       });
     } else {
       onSave({
         title: title.trim(), type: "chore", assignedTo: assignedTo || null, frequency,
         dueDate: frequency === "unique" ? dueDate : "",
         dueDayOfWeek: (frequency === "hebdomadaire" || frequency === "auxDeuxSemaines") && dueDayOfWeek !== "" ? Number(dueDayOfWeek) : null,
-        rotation: null, rotationIndex: 0, rotationAuto: null, notifyParent, steps: null,
+        rotation: null, rotationIndex: 0, rotationAuto: null, notifyParent, steps: [],
       });
     }
   };
