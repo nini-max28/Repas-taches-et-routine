@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
+import LandingPage from "./LandingPage";
+import { PrivacyPolicyPage, TermsPage } from "./LegalPages";
 import {
   ShoppingCart, ChefHat, CalendarDays, Settings, Plus, X, Check, Trash2, Pencil,
   RefreshCw, AlertCircle, Dice5, ChevronLeft, ChevronRight, Sparkles, ListTodo, UserPlus, Send, Bell,
@@ -878,10 +880,10 @@ function App({ session }) {
 
       <header style={{ padding: "20px 18px 0", maxWidth: 760, margin: "0 auto" }}>
         <div className="mono" style={{ fontSize: 11, letterSpacing: 1.5, color: COLORS.muted, textTransform: "uppercase" }}>
-          Épicerie · repas · idées de soupers
+          Épicerie · repas · tâches · routines
         </div>
         <h1 className="hand" onClick={handleTitleTap} style={{ margin: "2px 0 16px", fontSize: 38, color: COLORS.ink, fontWeight: 700, cursor: isKidLocked ? "default" : "auto", userSelect: "none" }}>
-          Épicerie & Repas
+          Planifamille
         </h1>
       </header>
 
@@ -2688,6 +2690,10 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
 export default function AppWithAuth() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState("signup");
+
+  const path = window.location.pathname;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -2700,16 +2706,29 @@ export default function AppWithAuth() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Ces deux pages sont publiques — accessibles même sans être connecté, et
+  // sans attendre la vérification de session puisqu'elles n'en ont pas besoin.
+  if (path === "/politique-de-confidentialite") return <PrivacyPolicyPage />;
+  if (path === "/conditions-utilisation") return <TermsPage />;
+
   if (checking) {
     return (
-      <div style={{ minHeight: "100vh", background: "#EAE2CB", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: "#7A7256" }}>
+      <div style={{ minHeight: "100vh", background: "#F5E7DA", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans', sans-serif", color: "#8A6F60" }}>
         Un instant…
       </div>
     );
   }
 
   if (!session) {
-    return <AuthScreen onAuthed={setSession} />;
+    if (!showAuth) {
+      return (
+        <LandingPage
+          onStart={() => { setAuthMode("signup"); setShowAuth(true); }}
+          onLogin={() => { setAuthMode("login"); setShowAuth(true); }}
+        />
+      );
+    }
+    return <AuthScreen initialMode={authMode} onAuthed={setSession} />;
   }
 
   return <App session={session} />;
