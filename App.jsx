@@ -1016,9 +1016,9 @@ function PinCard({ children: c }) {
     </div>
   );
 }
-
 function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToday, onPick, onClear, onAddIngredients }) {
   const planFor = (date) => weekPlan.find(p => p.date === date);
+  const todayD = todayStr();
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1028,41 +1028,58 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
         </button>
         <button onClick={onNextWeek} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronRight size={16} color={COLORS.accentDark} /></button>
       </div>
-      {weekDates.map(date => {
-        const plan = planFor(date);
-        const meal = plan?.mealIdeaId ? mealById(plan.mealIdeaId) : null;
-        const title = meal?.title || plan?.customTitle;
-        return (
-          <div key={date} className="ledger-row" style={{ background: COLORS.card, borderRadius: 10, padding: "12px 14px", marginBottom: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="mono" style={{ fontSize: 11, color: COLORS.muted, textTransform: "capitalize" }}>{fmtDayLabel(date)}</div>
-                {title
-                  ? <div style={{ fontWeight: 700, fontSize: 15, marginTop: 2 }}>{title}</div>
-                  : <div style={{ fontSize: 13.5, color: COLORS.muted, fontStyle: "italic", marginTop: 2 }}>Aucun repas choisi</div>}
-                {meal?.tags?.length > 0 && (
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                    {meal.tags.map(t => <span key={t} style={{ fontSize: 10.5, padding: "2px 7px", borderRadius: 10, background: "#F0EAD8", color: COLORS.muted }}>{t}</span>)}
-                  </div>
-                )}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
+        {weekDates.map(date => {
+          const plan = planFor(date);
+          const meal = plan?.mealIdeaId ? mealById(plan.mealIdeaId) : null;
+          const title = meal?.title || plan?.customTitle;
+          const isToday = date === todayD;
+          const [dow, dayNum] = fmtDayLabel(date).split(" ");
+          return (
+            <div key={date} style={{
+              minWidth: 132, flex: "0 0 132px", background: COLORS.card, borderRadius: 12,
+              border: isToday ? `2px solid ${COLORS.accent}` : "1.5px solid #E7E0CE",
+              display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              <div style={{
+                padding: "8px 10px", background: isToday ? COLORS.accent : "#F0EAD8",
+                color: isToday ? "#fff" : COLORS.muted, textAlign: "center",
+              }}>
+                <div className="mono" style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 }}>{dow}</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{dayNum}</div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => onPick(date)} style={{ ...outlineBtn, padding: "6px 10px", fontSize: 11.5 }}>
-                  {title ? <Pencil size={12} /> : <Plus size={12} />} {title ? "Changer" : "Choisir"}
-                </button>
-                {meal?.ingredients?.length > 0 && (
-                  <button onClick={() => onAddIngredients(meal)} style={{ ...outlineBtn, padding: "6px 10px", fontSize: 11.5 }}>
-                    <ShoppingCart size={12} /> Épicerie
-                  </button>
+              <div style={{ padding: 10, flex: 1, display: "flex", flexDirection: "column", gap: 8, minHeight: 120 }}>
+                {title ? (
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "8px 9px", border: "1px solid #E7E0CE" }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{title}</div>
+                    {meal?.tags?.length > 0 && (
+                      <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 5 }}>
+                        {meal.tags.slice(0, 2).map(t => <span key={t} style={{ fontSize: 9.5, padding: "1px 6px", borderRadius: 10, background: "#F0EAD8", color: COLORS.muted }}>{t}</span>)}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", flex: 1 }}>Aucun repas</div>
                 )}
+                <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                  <button onClick={() => onPick(date)} style={{ ...outlineBtn, padding: "6px 8px", fontSize: 11, justifyContent: "center" }}>
+                    {title ? <Pencil size={11} /> : <Plus size={11} />} {title ? "Changer" : "Choisir"}
+                  </button>
+                  {meal?.ingredients?.length > 0 && (
+                    <button onClick={() => onAddIngredients(meal)} style={{ ...outlineBtn, padding: "6px 8px", fontSize: 11, justifyContent: "center" }}>
+                      <ShoppingCart size={11} /> Épicerie
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
+
 
 function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, onReset }) {
   const grouped = AISLES.map(a => ({ ...a, items: items.filter(i => i.aisle === a.id) })).filter(a => a.items.length > 0);
