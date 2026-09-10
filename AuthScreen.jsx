@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "./supabaseClient";
 
-const COLORS = { paper: "#EAE2CB", card: "#F7F3E3", rule: "#D8D2BE", ink: "#22201A", muted: "#7A7256", accent: "#B8863A", accentDark: "#8A6423", danger: "#B5715F" };
+const COLORS = { paper: "#F5E7DA", card: "#FDF6EE", rule: "#EFD9C7", ink: "#3A2A20", muted: "#8A6F60", accent: "#DD8468", accentDark: "#C97456", danger: "#B5715F" };
 
 const inputStyle = {
   width: "100%", padding: "12px 14px", borderRadius: 8, border: `1.5px solid ${COLORS.rule}`,
@@ -14,8 +14,8 @@ const primaryBtn = {
 
 // Écran d'inscription/connexion — c'est la porte d'entrée du produit commercial.
 // Tant que la personne n'est pas connectée, elle ne voit jamais l'app elle-même.
-export default function AuthScreen({ onAuthed }) {
-  const [mode, setMode] = useState("signup"); // "signup" | "login"
+export default function AuthScreen({ onAuthed, initialMode = "signup" }) {
+  const [mode, setMode] = useState(initialMode); // "signup" | "login"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
