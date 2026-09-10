@@ -7,9 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       strategies: 'injectManifest',
-      srcDir: 'src',
+      srcDir: '.',
       filename: 'sw.js',
-      injectManifest: { swSrc: 'src/sw.js', swDest: 'dist/sw.js' },
+      injectManifest: { swSrc: 'sw.js', swDest: 'dist/sw.js' },
       manifest: false, // on garde notre propre public/manifest.json tel quel
       injectRegister: false, // l'app enregistre déjà le service worker elle-même
     }),
