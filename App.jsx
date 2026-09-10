@@ -1028,7 +1028,7 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
         </button>
         <button onClick={onNextWeek} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronRight size={16} color={COLORS.accentDark} /></button>
       </div>
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingBottom: 8 }}>
         {weekDates.map(date => {
           const plan = planFor(date);
           const meal = plan?.mealIdeaId ? mealById(plan.mealIdeaId) : null;
