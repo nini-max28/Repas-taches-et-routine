@@ -413,7 +413,8 @@ function isTaskDone(task) {
 // d'autres via la saisie manuelle.
 const ROUTINE_EMOJIS = ["🪥", "🪮", "🚿", "🛁", "🧼", "🧴", "👕", "🧦", "👖", "🎒", "🍱", "🥣", "🍎", "💧", "📖", "🧸", "💡", "🛏️", "🚽", "🧹", "⏰", "🌞", "🌙", "✅"];
 
-const COLORS = { paper: "#EDF1E7", card: "#FBF9F3", ink: "#2B2A22", accent: "#C98A2B", accentDark: "#A96F1E", muted: "#767159", danger: "#A6634A" };
+const COLORS = { paper: "#F5E7DA", card: "#FDF6EE", rule: "#EFD9C7", ink: "#3A2A20", accent: "#DD8468", accentDark: "#C97456", muted: "#8A6F60", danger: "#A6634A" };
+
 
 // Lance le paiement Stripe pour le plan choisi, et redirige vers la page de
 // paiement hébergée par Stripe.
