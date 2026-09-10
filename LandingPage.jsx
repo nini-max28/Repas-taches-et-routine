@@ -56,7 +56,7 @@ const FEATURES = [
 export default function LandingPage({ onStart, onLogin }) {
   return (
     <div style={{ minHeight: "100vh", background: COLORS.paper, fontFamily: "'IBM Plex Sans', sans-serif", color: COLORS.ink }}>
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 20px 60px" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "48px 20px 60px" }}>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 40 }}>
           <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 700 }}>Planifamille</span>
@@ -83,7 +83,7 @@ export default function LandingPage({ onStart, onLogin }) {
 
         <InstallBanner />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 48 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginBottom: 48 }}>
           {FEATURES.map((f, i) => (
             <div key={i} style={{ background: COLORS.card, borderRadius: 14, padding: 20, border: `1px solid ${COLORS.rule}` }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>{f.emoji}</div>
