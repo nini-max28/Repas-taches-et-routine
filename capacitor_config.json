@@ -1,0 +1,8 @@
+{
+  "appId": "ca.planifamille.app",
+  "appName": "Planifamille",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
