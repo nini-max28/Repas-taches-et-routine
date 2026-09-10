@@ -4,8 +4,8 @@
   "description": "Épicerie, repas, tâches et routines familiales, tout au même endroit",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#EDF1E7",
-  "theme_color": "#C98A2B",
+  "background_color": "#F5E7DA",
+  "theme_color": "#C97456",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
