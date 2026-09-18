@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
-import { PrivacyPolicyPage, TermsPage } from "./LegalPages";
+import { PrivacyPolicyPage, TermsPage, SupportPage } from "./LegalPages";
 import {
   ShoppingCart, ChefHat, CalendarDays, Settings, Plus, X, Check, Trash2, Pencil,
   RefreshCw, AlertCircle, Dice5, ChevronLeft, ChevronRight, Sparkles, ListTodo, UserPlus, Send, Bell,
@@ -2743,6 +2743,7 @@ export default function AppWithAuth() {
   // sans attendre la vérification de session puisqu'elles n'en ont pas besoin.
   if (path === "/politique-de-confidentialite") return <PrivacyPolicyPage />;
   if (path === "/conditions-utilisation") return <TermsPage />;
+  if (path === "/assistance") return <SupportPage />;
 
   if (checking) {
     return (
