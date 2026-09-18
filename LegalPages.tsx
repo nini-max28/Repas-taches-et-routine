@@ -29,7 +29,7 @@ export function PrivacyPolicyPage() {
       <p style={p}>Planifamille, exploitée par Stéphanie Doucet, est responsable de la collecte et de la protection des renseignements personnels recueillis par l'application.</p>
 
       <h2 style={h2}>Responsable de la protection des renseignements personnels</h2>
-      <p style={p}>Stéphanie Doucet, responsable de la protection des renseignements personnels.<br />Courriel : info@planifamille.ca</p>
+      <p style={p}>Stéphanie Doucet, responsable de la protection des renseignements personnels.<br />Courriel : info@planifamille.com</p>
 
       <h2 style={h2}>Quels renseignements nous recueillons</h2>
       <p style={p}>
@@ -54,7 +54,7 @@ export function PrivacyPolicyPage() {
       <p style={p}>Chiffrement des mots de passe, séparation stricte des données entre chaque famille abonnée, accès limité au personnel qui en a besoin, surveillance des accès à la base de données.</p>
 
       <h2 style={h2}>Vos droits</h2>
-      <p style={p}>Vous pouvez en tout temps consulter, corriger ou demander la suppression de vos renseignements, ou en demander une copie transférable, en écrivant à info@planifamille.ca. Nous répondrons dans un délai de 30 jours. Vous pouvez aussi déposer une plainte auprès de la Commission d'accès à l'information du Québec.</p>
+      <p style={p}>Vous pouvez en tout temps consulter, corriger ou demander la suppression de vos renseignements, ou en demander une copie transférable, en écrivant à info@planifamille.com. Nous répondrons dans un délai de 30 jours. Vous pouvez aussi déposer une plainte auprès de la Commission d'accès à l'information du Québec.</p>
 
       <h2 style={h2}>Incidents de confidentialité</h2>
       <p style={p}>En cas d'incident présentant un risque de préjudice sérieux, nous en informerons la Commission d'accès à l'information du Québec et les personnes concernées, conformément à nos obligations légales.</p>
@@ -63,7 +63,7 @@ export function PrivacyPolicyPage() {
       <p style={p}>Nous pouvons mettre à jour cette politique. Toute modification importante vous sera communiquée par courriel ou par un avis dans l'application avant son entrée en vigueur.</p>
 
       <h2 style={h2}>Nous joindre</h2>
-      <p style={p}>info@planifamille.ca</p>
+      <p style={p}>info@planifamille.com</p>
     </Layout>
   );
 }
@@ -98,7 +98,27 @@ export function TermsPage() {
       <p style={p}>Ces conditions sont régies par les lois de la province de Québec et les lois fédérales du Canada applicables.</p>
 
       <h2 style={h2}>Nous joindre</h2>
-      <p style={p}>info@planifamille.ca</p>
+      <p style={p}>info@planifamille.com</p>
+    </Layout>
+  );
+}
+
+export function SupportPage() {
+  return (
+    <Layout title="Assistance">
+      <p style={p}>Besoin d'aide avec Planifamille? Voici les réponses aux questions les plus fréquentes.</p>
+
+      <h2 style={h2}>Comment fonctionne l'essai gratuit?</h2>
+      <p style={p}>Chaque nouveau compte profite de 7 jours d'essai gratuit, sans carte de crédit requise. À la fin de l'essai, un abonnement mensuel ou annuel est nécessaire pour continuer à utiliser l'application.</p>
+
+      <h2 style={h2}>Comment annuler mon abonnement?</h2>
+      <p style={p}>Dans l'application, allez dans Paramètres → Abonnement → "Gérer mon abonnement". Vous serez redirigé vers une page sécurisée où vous pouvez annuler en tout temps.</p>
+
+      <h2 style={h2}>Comment ajouter des membres de ma famille?</h2>
+      <p style={p}>Dans la section Tâches ou Paramètres de l'application, vous pouvez ajouter chaque membre de votre famille avec son prénom et une couleur qui lui est propre.</p>
+
+      <h2 style={h2}>J'ai un problème technique ou une question</h2>
+      <p style={p}>Écrivez-nous à info@planifamille.com et nous vous répondrons dans les meilleurs délais.</p>
     </Layout>
   );
 }
