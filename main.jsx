@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import { LanguageProvider } from './i18n.jsx'
 
 // Enregistre le service worker dès l'ouverture — c'est ce qui permet à l'app
 // de rester utilisable même sans connexion internet, pas seulement quand les
@@ -13,6 +14,8 @@ if ('serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </React.StrictMode>,
 )
