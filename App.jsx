@@ -3,10 +3,13 @@ import { supabase } from "./supabaseClient";
 import AuthScreen from "./AuthScreen";
 import LandingPage from "./LandingPage";
 import { PrivacyPolicyPage, TermsPage, SupportPage } from "./LegalPages";
+import { Capacitor } from "@capacitor/core";
+import { isNativeApp, initRevenueCat, getOfferings, purchasePackage, restorePurchases, hasActiveEntitlement } from "./revenuecat";
+import { useLanguage } from "./i18n.jsx";
 import {
   ShoppingCart, ChefHat, CalendarDays, Settings, Plus, X, Check, Trash2, Pencil,
   RefreshCw, AlertCircle, Dice5, ChevronLeft, ChevronRight, Sparkles, ListTodo, UserPlus, Send, Bell,
-  Camera, FileText
+  Camera, FileText, UserCircle, LogOut
 } from "lucide-react";
 
 const LS_PREFIX = "epicerieRepas:";
@@ -416,22 +419,44 @@ const ROUTINE_EMOJIS = ["🪥", "🪮", "🚿", "🛁", "🧼", "🧴", "👕", 
 const COLORS = { paper: "#F5E7DA", card: "#FDF6EE", rule: "#EFD9C7", ink: "#3A2A20", accent: "#DD8468", accentDark: "#C97456", muted: "#8A6F60", danger: "#A6634A" };
 
 
-// Lance le paiement Stripe pour le plan choisi, et redirige vers la page de
-// paiement hébergée par Stripe.
-async function startCheckout(plan, setBusy, setError) {
+// Lance le paiement pour le plan choisi — via Apple/Google (RevenueCat) si
+// l'app tourne comme vraie app installée, ou via Stripe si c'est le site web.
+async function startCheckout(plan, setBusy, setError, onNativeSuccess) {
   setBusy(true); setError("");
   try {
+    if (isNativeApp()) {
+      const offerings = await getOfferings();
+      const productId = plan === "annual" ? "ca.planifamille.app.annual" : "ca.planifamille.app.monthly";
+      const pkg = offerings.find(p => p.product.identifier === productId);
+      if (!pkg) throw new Error("Ce forfait n'est pas disponible pour le moment.");
+      const customerInfo = await purchasePackage(pkg);
+      if (!hasActiveEntitlement(customerInfo)) throw new Error("L'achat n'a pas pu être confirmé.");
+      if (onNativeSuccess) await onNativeSuccess();
+      setBusy(false);
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("create-checkout-session", { body: { plan } });
     if (error || !data?.url) throw new Error(data?.error || "Impossible de démarrer le paiement.");
     window.location.href = data.url;
   } catch (err) {
-    setError(err.message);
+    if (err?.userCancelled) { setBusy(false); return; } // la personne a simplement fermé la fenêtre d'Apple/Google
+    setError(err.message || "Une erreur est survenue.");
     setBusy(false);
   }
 }
 async function openBillingPortal(setBusy, setError) {
   setBusy(true); setError("");
   try {
+    if (isNativeApp()) {
+      // Sur iOS/Android, l'abonnement se gère dans les réglages natifs
+      // d'Apple ou de Google, pas dans un portail web — Stripe n'entre pas en
+      // jeu pour un achat fait dans l'app.
+      window.location.href = Capacitor.getPlatform() === "ios"
+        ? "itms-apps://apps.apple.com/account/subscriptions"
+        : "https://play.google.com/store/account/subscriptions";
+      setBusy(false);
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("create-portal-session", { body: {} });
     if (error || !data?.url) throw new Error(data?.error || "Impossible d'ouvrir la gestion de l'abonnement.");
     window.location.href = data.url;
@@ -454,24 +479,68 @@ function Paywall({ familyInfo }) {
           Abonnez-vous pour continuer à utiliser votre épicerie, vos repas, vos tâches et vos routines familiales.
         </p>
         {error && <p style={{ color: "#B5715F", fontSize: 13, marginBottom: 14 }}>{error}</p>}
-        <button disabled={busy} onClick={() => startCheckout("monthly", setBusy, setError)} style={{
+        <button disabled={busy} onClick={() => startCheckout("monthly", setBusy, setError, () => window.location.reload())} style={{
           width: "100%", padding: "13px 16px", borderRadius: 8, border: "none", background: "#8A6423",
           color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 10, opacity: busy ? 0.6 : 1,
         }}>S'abonner — mensuel</button>
-        <button disabled={busy} onClick={() => startCheckout("annual", setBusy, setError)} style={{
+        <button disabled={busy} onClick={() => startCheckout("annual", setBusy, setError, () => window.location.reload())} style={{
           width: "100%", padding: "13px 16px", borderRadius: 8, border: "1.5px solid #8A6423", background: "transparent",
           color: "#8A6423", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: busy ? 0.6 : 1,
         }}>S'abonner — annuel (meilleure valeur)</button>
         <p style={{ fontSize: 12, color: "#7A7256", marginTop: 18 }}>
-          Vous serez redirigé vers une page de paiement sécurisée. Vos données vous attendent, elles ne sont pas perdues.
+          {isNativeApp()
+            ? "L'achat se confirme directement avec votre compte Apple ou Google."
+            : "Vous serez redirigé vers une page de paiement sécurisée. Vos données vous attendent, elles ne sont pas perdues."}
         </p>
+        {isNativeApp() && (
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true); setError("");
+              try {
+                const info = await restorePurchases();
+                if (hasActiveEntitlement(info)) window.location.reload();
+                else setError("Aucun achat actif à restaurer sur ce compte.");
+              } catch (err) { setError(err.message || "Impossible de restaurer les achats."); }
+              setBusy(false);
+            }}
+            style={{ background: "none", border: "none", color: "#7A7256", fontSize: 12.5, textDecoration: "underline", cursor: "pointer", marginTop: 8 }}
+          >
+            Restaurer mes achats
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 
+// Petit menu déroulant dans l'en-tête — l'endroit où se trouve maintenant la
+// déconnexion, séparé des réglages du quotidien.
+function AccountMenu({ session }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-label="Compte" style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", padding: 6 }}>
+        <UserCircle size={26} />
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+          <div style={{ position: "absolute", right: 0, top: "110%", background: COLORS.card, border: `1px solid ${COLORS.rule}`, borderRadius: 10, padding: 12, minWidth: 220, boxShadow: "0 6px 18px rgba(0,0,0,0.12)", zIndex: 21 }}>
+            <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 10px", wordBreak: "break-all" }}>{session?.user?.email}</p>
+            <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", color: COLORS.danger, fontSize: 13.5, fontWeight: 600, cursor: "pointer", padding: "6px 0" }}>
+              <LogOut size={15} /> Se déconnecter
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function App({ session }) {
+  const { t: tr } = useLanguage();
   const [loaded, setLoaded] = useState(false);
   const [groceryItems, setGroceryItems] = useState([]);
   const [mealIdeas, setMealIdeas] = useState([]);
@@ -540,6 +609,7 @@ function App({ session }) {
   }, []);
 
   useEffect(() => {
+    if (session?.user?.id) initRevenueCat(session.user.id);
     loadAll();
     const interval = setInterval(() => loadAll(), 30000);
     const onFocus = () => loadAll();
@@ -826,9 +896,9 @@ function App({ session }) {
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const mealById = (id) => mealIdeas.find(m => m.id === id);
 
-  // Un appareil "d'enfant" (identifié via Paramètres, avec l'accès restreint coché
+  // Un appareil "d'enfant" (identifié via Réglages, avec l'accès restreint coché
   // sur ce membre) atterrit directement sur sa page "Moi" — routines et défis
-  // récompense en grand — au lieu des onglets habituels, et les Paramètres sont
+  // récompense en grand — au lieu des onglets habituels, et les Réglages sont
   // cachés du menu. Toucher le titre 5 fois de suite les fait réapparaître pour vous.
   const myMember = members.find(m => m.id === myMemberId);
   const isKidLocked = !!(myMember && myMember.kidMode) && !unlocked;
@@ -895,23 +965,28 @@ function App({ session }) {
       `}</style>
 
       <header style={{ padding: "20px 18px 0", maxWidth: 760, margin: "0 auto" }}>
-        <div className="mono" style={{ fontSize: 11, letterSpacing: 1.5, color: COLORS.muted, textTransform: "uppercase" }}>
-          Épicerie · repas · tâches · routines
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div className="mono" style={{ fontSize: 11, letterSpacing: 1.5, color: COLORS.muted, textTransform: "uppercase" }}>
+              Épicerie · repas · tâches · routines
+            </div>
+            <h1 className="hand" onClick={handleTitleTap} style={{ margin: "2px 0 16px", fontSize: 38, color: COLORS.ink, fontWeight: 700, cursor: isKidLocked ? "default" : "auto", userSelect: "none" }}>
+              Planifamille
+            </h1>
+          </div>
+          {!isKidLocked && <AccountMenu session={session} />}
         </div>
-        <h1 className="hand" onClick={handleTitleTap} style={{ margin: "2px 0 16px", fontSize: 38, color: COLORS.ink, fontWeight: 700, cursor: isKidLocked ? "default" : "auto", userSelect: "none" }}>
-          Planifamille
-        </h1>
       </header>
 
       <nav style={{ maxWidth: 760, margin: "0 auto", padding: "0 18px" }}>
         <div style={{ display: "flex", gap: 4, borderBottom: "3px solid #D8D2BE", overflowX: "auto" }}>
           {(isKidLocked ? [{ id: "moi", label: myMember?.name || "Moi", icon: Sparkles }] : [
             ...(myMember ? [{ id: "moi", label: "Moi", icon: Sparkles }] : []),
-            { id: "semaine", label: "Semaine", icon: CalendarDays },
-            { id: "epicerie", label: "Épicerie", icon: ShoppingCart },
-            { id: "idees", label: "Idées", icon: ChefHat },
-            { id: "taches", label: "Tâches", icon: ListTodo },
-            { id: "params", label: "Paramètres", icon: Settings },
+            { id: "semaine", label: tr("nav.week"), icon: CalendarDays },
+            { id: "epicerie", label: tr("nav.grocery"), icon: ShoppingCart },
+            { id: "idees", label: tr("nav.meals"), icon: ChefHat },
+            { id: "taches", label: tr("nav.tasks"), icon: ListTodo },
+            { id: "params", label: tr("nav.settings"), icon: Settings },
           ]).map(t => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -1106,8 +1181,8 @@ function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, 
   const unchecked = items.filter(i => !i.checked);
 
   const sendList = async () => {
-    if (!settings.backendUrl) { setSendMsg("❌ Configurez d'abord l'adresse du backend dans Paramètres."); return; }
-    if (phones.length === 0) { setSendMsg("❌ Ajoutez au moins un numéro dans Paramètres."); return; }
+    if (!settings.backendUrl) { setSendMsg("❌ Configurez d'abord l'adresse du backend dans Réglages."); return; }
+    if (phones.length === 0) { setSendMsg("❌ Ajoutez au moins un numéro dans Réglages."); return; }
     if (unchecked.length === 0) { setSendMsg("La liste est vide (ou tout est déjà coché)."); return; }
     setSending(true); setSendMsg("");
     try {
@@ -1906,6 +1981,7 @@ function Card({ title, children: c }) {
 }
 
 function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, myMemberId, setMyMemberId, onExport, onImport, session, familyInfo }) {
+  const { t: tr, lang, setLang } = useLanguage();
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState("");
   const [form, setForm] = useState(settings);
@@ -2181,13 +2257,11 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </p>
       </Card>
 
-      <Card title="Compte">
-        <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Connecté en tant que <strong>{session?.user?.email}</strong>
-        </p>
-        <button type="button" onClick={() => supabase.auth.signOut()} style={{ ...outlineBtn, borderColor: COLORS.danger, color: COLORS.danger }}>
-          Se déconnecter
-        </button>
+      <Card title={tr("settings.language")}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={() => setLang("fr")} style={lang === "fr" ? primaryBtn : outlineBtn}>{tr("settings.languageFrench")}</button>
+          <button type="button" onClick={() => setLang("en")} style={lang === "en" ? primaryBtn : outlineBtn}>{tr("settings.languageEnglish")}</button>
+        </div>
       </Card>
 
       <Card title="Abonnement">
@@ -2217,8 +2291,8 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
                 : "Votre essai est terminé."}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError)} style={primaryBtn}>S'abonner — mensuel</button>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError)} style={outlineBtn}>S'abonner — annuel</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError, onRefresh)} style={primaryBtn}>S'abonner — mensuel</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError, onRefresh)} style={outlineBtn}>S'abonner — annuel</button>
             </div>
           </>
         )}
@@ -2448,7 +2522,7 @@ function MemberModal({ member, onClose, onSave }) {
         <span>
           <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>Accès restreint (vue simplifiée)</span>
           <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
-            Sur l'appareil de cet enfant, l'app ne montre que ses routines et ses défis récompense en grand — pas les Paramètres ni les autres onglets.
+            Sur l'appareil de cet enfant, l'app ne montre que ses routines et ses défis récompense en grand — pas les Réglages ni les autres onglets.
           </span>
         </span>
       </label>
@@ -2711,7 +2785,7 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
         <span>
           <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>Aussi avertir un parent</span>
           <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
-            Envoie une copie SMS aux numéros de la famille (Paramètres) en plus de l'alerte à l'enfant — utile pour un jeune enfant, en filet de sécurité.
+            Envoie une copie SMS aux numéros de la famille (Réglages) en plus de l'alerte à l'enfant — utile pour un jeune enfant, en filet de sécurité.
           </span>
         </span>
       </label>
