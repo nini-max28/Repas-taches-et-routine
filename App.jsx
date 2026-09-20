@@ -599,12 +599,18 @@ function App({ session }) {
   };
 
   const importBackup = async (file) => {
+    // Le "confirm" doit être appelé AVANT tout "await" — Safari sur iPhone/iPad
+    // bloque silencieusement les fenêtres de confirmation/alerte si elles
+    // apparaissent après une étape asynchrone (même une simple lecture de
+    // fichier), sans montrer d'erreur. On confirme donc tout de suite, puis on
+    // valide le contenu du fichier ensuite.
+    if (!window.confirm("Remplacer toutes les données actuelles par celles de ce fichier de sauvegarde? Cette action ne peut pas être annulée.")) return false;
+    if (!familyId) return false;
+
     try {
       const text = await file.text();
       const data = JSON.parse(text);
       if (!data || typeof data !== "object") throw new Error("format invalide");
-      if (!window.confirm("Remplacer toutes les données actuelles par celles de ce fichier de sauvegarde? Cette action ne peut pas être annulée.")) return false;
-      if (!familyId) return false;
 
       const gi = data.groceryItems || [];
       const mi = data.mealIdeas || [];
