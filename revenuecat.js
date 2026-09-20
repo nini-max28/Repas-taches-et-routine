@@ -7,7 +7,7 @@ import { Purchases } from "@revenuecat/purchases-capacitor";
 // Clé publique RevenueCat — spécifique à la plateforme (iOS a sa propre clé,
 // Android aura la sienne une fois ajoutée). Trouvable dans RevenueCat →
 // Project Settings → API Keys.
-const REVENUECAT_API_KEY_IOS = "VOTRE_CLÉ_PUBLIQUE_IOS_ICI";
+const REVENUECAT_API_KEY_IOS = "appl_VTxilDlwlQBGYJFQvwDYldERTHK";
 const REVENUECAT_API_KEY_ANDROID = "VOTRE_CLÉ_PUBLIQUE_ANDROID_ICI";
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
