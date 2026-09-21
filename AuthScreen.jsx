@@ -15,7 +15,7 @@ const primaryBtn = {
 // Écran d'inscription/connexion — c'est la porte d'entrée du produit commercial.
 // Tant que la personne n'est pas connectée, elle ne voit jamais l'app elle-même.
 export default function AuthScreen({ onAuthed, initialMode = "signup", onBack }) {
-  const [mode, setMode] = useState(initialMode); // "signup" | "login"
+  const [mode, setMode] = useState(initialMode); // "signup" | "login" | "reset"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,6 +34,12 @@ export default function AuthScreen({ onAuthed, initialMode = "signup", onBack })
         } else {
           setMessage("Vérifiez votre courriel pour confirmer votre compte, puis revenez vous connecter.");
         }
+      } else if (mode === "reset") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reinitialiser-mot-de-passe`,
+        });
+        if (resetError) throw resetError;
+        setMessage("Si un compte existe avec ce courriel, un lien pour choisir un nouveau mot de passe vient d'être envoyé.");
       } else {
         const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
         if (loginError) throw loginError;
@@ -54,32 +60,95 @@ export default function AuthScreen({ onAuthed, initialMode = "signup", onBack })
           </button>
         )}
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: COLORS.ink, marginTop: 0, marginBottom: 4 }}>
-          {mode === "signup" ? "Créer un compte" : "Se connecter"}
+          {mode === "signup" ? "Créer un compte" : mode === "reset" ? "Mot de passe oublié" : "Se connecter"}
         </h1>
         <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0, marginBottom: 22 }}>
-          {mode === "signup" ? "7 jours d'essai gratuit, sans carte de crédit." : "Content de vous revoir."}
+          {mode === "signup" ? "7 jours d'essai gratuit, sans carte de crédit." : mode === "reset" ? "Entrez votre courriel pour recevoir un lien de réinitialisation." : "Content de vous revoir."}
         </p>
 
         <form onSubmit={submit}>
           <label style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, display: "block", marginBottom: 6 }}>Courriel</label>
           <input type="email" required value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} placeholder="vous@exemple.com" />
 
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, display: "block", marginBottom: 6 }}>Mot de passe</label>
-          <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Au moins 6 caractères" />
+          {mode !== "reset" && (
+            <>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, display: "block", marginBottom: 6 }}>Mot de passe</label>
+              <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Au moins 6 caractères" />
+            </>
+          )}
+
+          {mode === "login" && (
+            <button type="button" onClick={() => { setMode("reset"); setError(""); setMessage(""); }} style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 12.5, cursor: "pointer", padding: 0, display: "block", marginTop: -6, marginBottom: 14, textDecoration: "underline" }}>
+              Mot de passe oublié?
+            </button>
+          )}
 
           {error && <p style={{ color: COLORS.danger, fontSize: 13, marginTop: -6, marginBottom: 14 }}>{error}</p>}
           {message && <p style={{ color: COLORS.accentDark, fontSize: 13, marginTop: -6, marginBottom: 14 }}>{message}</p>}
 
           <button type="submit" disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-            {busy ? "Un instant…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
+            {busy ? "Un instant…" : mode === "signup" ? "Créer mon compte" : mode === "reset" ? "Envoyer le lien" : "Se connecter"}
           </button>
         </form>
 
-        <button onClick={() => { setMode(m => m === "signup" ? "login" : "signup"); setError(""); setMessage(""); }} style={{
-          background: "none", border: "none", color: COLORS.accentDark, fontSize: 13, marginTop: 16, cursor: "pointer", width: "100%", textAlign: "center",
-        }}>
-          {mode === "signup" ? "Déjà un compte? Se connecter" : "Pas encore de compte? S'inscrire"}
-        </button>
+        {mode === "reset" ? (
+          <button onClick={() => { setMode("login"); setError(""); setMessage(""); }} style={{
+            background: "none", border: "none", color: COLORS.accentDark, fontSize: 13, marginTop: 16, cursor: "pointer", width: "100%", textAlign: "center",
+          }}>
+            ← Retour à la connexion
+          </button>
+        ) : (
+          <button onClick={() => { setMode(m => m === "signup" ? "login" : "signup"); setError(""); setMessage(""); }} style={{
+            background: "none", border: "none", color: COLORS.accentDark, fontSize: 13, marginTop: 16, cursor: "pointer", width: "100%", textAlign: "center",
+          }}>
+            {mode === "signup" ? "Déjà un compte? Se connecter" : "Pas encore de compte? S'inscrire"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Écran affiché une fois que la personne a cliqué le lien reçu par courriel —
+// Supabase l'a déjà connectée temporairement à ce moment-là, il ne reste qu'à
+// choisir un nouveau mot de passe.
+export function ResetPasswordConfirm({ onDone }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setError("");
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+      setDone(true);
+    } catch (err) {
+      setError(traduireErreur(err.message));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: COLORS.paper, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'IBM Plex Sans', sans-serif" }}>
+      <div style={{ width: "100%", maxWidth: 380, background: COLORS.card, borderRadius: 16, padding: 28, border: `1px solid ${COLORS.rule}` }}>
+        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: COLORS.ink, marginTop: 0, marginBottom: 4 }}>Nouveau mot de passe</h1>
+        {done ? (
+          <>
+            <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 20 }}>Votre mot de passe a été changé avec succès.</p>
+            <button onClick={onDone} style={primaryBtn}>Continuer</button>
+          </>
+        ) : (
+          <form onSubmit={submit}>
+            <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0, marginBottom: 22 }}>Choisissez votre nouveau mot de passe.</p>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.ink, display: "block", marginBottom: 6 }}>Nouveau mot de passe</label>
+            <input type="password" required minLength={6} value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="Au moins 6 caractères" />
+            {error && <p style={{ color: COLORS.danger, fontSize: 13, marginTop: -6, marginBottom: 14 }}>{error}</p>}
+            <button type="submit" disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Un instant…" : "Changer le mot de passe"}</button>
+          </form>
+        )}
       </div>
     </div>
   );
