@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "./supabaseClient";
-import AuthScreen from "./AuthScreen";
+import AuthScreen, { ResetPasswordConfirm } from "./AuthScreen";
 import LandingPage from "./LandingPage";
 import { PrivacyPolicyPage, TermsPage, SupportPage } from "./LegalPages";
 import { Capacitor } from "@capacitor/core";
@@ -515,27 +515,45 @@ function Paywall({ familyInfo }) {
 }
 
 
-// Petit menu déroulant dans l'en-tête — l'endroit où se trouve maintenant la
-// déconnexion, séparé des réglages du quotidien.
-function AccountMenu({ session }) {
+// Fenêtre de compte — utilise le même "bottom sheet" fiable que les autres
+// fenêtres de l'app (plus robuste sur mobile qu'un petit menu déroulant).
+function AccountMenu({ session, familyInfo }) {
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const isActive = familyInfo?.subscriptionStatus === "active";
+  const isPastDue = familyInfo?.subscriptionStatus === "past_due";
+  const trialEndsAt = familyInfo?.trialEndsAt;
+
   return (
-    <div style={{ position: "relative" }}>
-      <button type="button" onClick={() => setOpen(o => !o)} aria-label="Compte" style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", padding: 6 }}>
+    <>
+      <button type="button" onClick={() => setOpen(true)} aria-label="Compte" style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", padding: 6 }}>
         <UserCircle size={26} />
       </button>
       {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-          <div style={{ position: "absolute", right: 0, top: "110%", background: COLORS.card, border: `1px solid ${COLORS.rule}`, borderRadius: 10, padding: 12, minWidth: 220, boxShadow: "0 6px 18px rgba(0,0,0,0.12)", zIndex: 21 }}>
-            <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 10px", wordBreak: "break-all" }}>{session?.user?.email}</p>
-            <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", color: COLORS.danger, fontSize: 13.5, fontWeight: 600, cursor: "pointer", padding: "6px 0" }}>
-              <LogOut size={15} /> Se déconnecter
+        <ModalShell title="Mon compte" onClose={() => setOpen(false)}>
+          <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 16px", wordBreak: "break-all" }}>{session?.user?.email}</p>
+
+          <div style={{ background: "#F0EAD8", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+            <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 10px" }}>
+              {isActive ? `✅ Abonnement actif (${familyInfo.plan === "annual" ? "annuel" : "mensuel"})`
+                : isPastDue ? "⚠️ Le dernier paiement a échoué"
+                : trialEndsAt && new Date(trialEndsAt) > new Date() ? `🕐 Essai gratuit — se termine le ${new Date(trialEndsAt).toLocaleDateString("fr-CA")}`
+                : "Aucun abonnement actif"}
+            </p>
+            {error && <p style={{ color: COLORS.danger, fontSize: 12, marginBottom: 10 }}>{error}</p>}
+            <button type="button" disabled={busy} onClick={() => openBillingPortal(setBusy, setError)} style={{ ...outlineBtn, width: "100%" }}>
+              {isActive || isPastDue ? "Gérer mon abonnement" : "S'abonner"}
             </button>
           </div>
-        </>
+
+          <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "none", border: `1.5px solid ${COLORS.danger}`, borderRadius: 8, padding: "10px 16px", color: COLORS.danger, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            <LogOut size={15} /> Se déconnecter
+          </button>
+        </ModalShell>
       )}
-    </div>
+    </>
   );
 }
 
@@ -974,7 +992,7 @@ function App({ session }) {
               Planifamille
             </h1>
           </div>
-          {!isKidLocked && <AccountMenu session={session} />}
+          {!isKidLocked && <AccountMenu session={session} familyInfo={familyInfo} />}
         </div>
       </header>
 
@@ -2805,6 +2823,7 @@ export default function AppWithAuth() {
   const [checking, setChecking] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState("signup");
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const path = window.location.pathname;
 
@@ -2813,7 +2832,8 @@ export default function AppWithAuth() {
       setSession(data.session);
       setChecking(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
       setSession(newSession);
     });
     return () => listener.subscription.unsubscribe();
@@ -2824,6 +2844,11 @@ export default function AppWithAuth() {
   if (path === "/politique-de-confidentialite") return <PrivacyPolicyPage />;
   if (path === "/conditions-utilisation") return <TermsPage />;
   if (path === "/assistance") return <SupportPage />;
+
+  // La personne vient de cliquer le lien reçu par courriel pour choisir un
+  // nouveau mot de passe — cet écran passe avant tout le reste, peu importe
+  // l'état de connexion habituel.
+  if (passwordRecovery) return <ResetPasswordConfirm onDone={() => setPasswordRecovery(false)} />;
 
   if (checking) {
     return (
