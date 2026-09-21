@@ -2842,7 +2842,7 @@ export default function AppWithAuth() {
         />
       );
     }
-    return <AuthScreen initialMode={authMode} onAuthed={setSession} />;
+    return <AuthScreen initialMode={authMode} onAuthed={setSession} onBack={() => setShowAuth(false)} />;
   }
 
   return <App session={session} />;
