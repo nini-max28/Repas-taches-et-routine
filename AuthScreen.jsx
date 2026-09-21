@@ -14,7 +14,7 @@ const primaryBtn = {
 
 // Écran d'inscription/connexion — c'est la porte d'entrée du produit commercial.
 // Tant que la personne n'est pas connectée, elle ne voit jamais l'app elle-même.
-export default function AuthScreen({ onAuthed, initialMode = "signup" }) {
+export default function AuthScreen({ onAuthed, initialMode = "signup", onBack }) {
   const [mode, setMode] = useState(initialMode); // "signup" | "login"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,11 +48,16 @@ export default function AuthScreen({ onAuthed, initialMode = "signup" }) {
   return (
     <div style={{ minHeight: "100vh", background: COLORS.paper, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'IBM Plex Sans', sans-serif" }}>
       <div style={{ width: "100%", maxWidth: 380, background: COLORS.card, borderRadius: 16, padding: 28, border: `1px solid ${COLORS.rule}` }}>
+        {onBack && (
+          <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 13, cursor: "pointer", padding: 0, marginBottom: 14, display: "flex", alignItems: "center", gap: 4 }}>
+            ← Retour
+          </button>
+        )}
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, color: COLORS.ink, marginTop: 0, marginBottom: 4 }}>
           {mode === "signup" ? "Créer un compte" : "Se connecter"}
         </h1>
         <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0, marginBottom: 22 }}>
-          {mode === "signup" ? "14 jours d'essai gratuit, sans carte de crédit." : "Content de vous revoir."}
+          {mode === "signup" ? "7 jours d'essai gratuit, sans carte de crédit." : "Content de vous revoir."}
         </p>
 
         <form onSubmit={submit}>
