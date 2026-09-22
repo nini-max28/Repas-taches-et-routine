@@ -2560,6 +2560,7 @@ function MemberModal({ member, onClose, onSave }) {
 }
 
 function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
+  const { t: tr } = useLanguage();
   const [title, setTitle] = useState(task?.title || "");
   const [mode, setMode] = useState(task?.type === "routine" ? "routine" : task?.rotation?.length ? "rotation" : "simple");
   const [assignedTo, setAssignedTo] = useState(task?.assignedTo || "");
@@ -2590,16 +2591,16 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
 
   const submit = (e) => {
     e.preventDefault();
-    if (!title.trim()) { setErr("Le titre est requis."); return; }
+    if (!title.trim()) { setErr(tr("task.titleRequired")); return; }
     if (mode === "routine") {
-      if (steps.length < 1) { setErr("Ajoutez au moins une étape à la routine."); return; }
+      if (steps.length < 1) { setErr(tr("task.needOneStep")); return; }
       onSave({
         title: title.trim(), type: "routine", steps, checkedSteps: task?.checkedSteps || {},
         assignedTo: assignedTo || null, notifyParent, notifyTime: notifyTime || null, linkedRewardChartId: linkedRewardChartId || null,
         rotation: null, rotationIndex: 0, rotationAuto: null, frequency: null, dueDate: "", dueDayOfWeek: null,
       });
     } else if (mode === "rotation") {
-      if (rotation.length < 2) { setErr("Choisissez au moins deux personnes pour l'alternance."); return; }
+      if (rotation.length < 2) { setErr(tr("task.needTwoPeople")); return; }
       onSave({
         title: title.trim(), type: "chore", rotation, rotationIndex: task?.rotationIndex || 0, turnStartDate: task?.turnStartDate || todayStr(),
         rotationAuto: rotationAuto || null,
@@ -2617,13 +2618,13 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
   };
 
   return (
-    <ModalShell title={task ? "Modifier la tâche" : "Nouvelle tâche"} onClose={onClose} onSubmit={submit}>
-      <label style={labelStyle}>Tâche</label>
-      <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex. Sortir les poubelles, Routine du matin…" autoFocus />
+    <ModalShell title={task ? tr("task.edit") : tr("task.new")} onClose={onClose} onSubmit={submit}>
+      <label style={labelStyle}>{tr("task.title")}</label>
+      <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder={tr("task.titlePlaceholder")} autoFocus />
 
-      <label style={labelStyle}>Mode d'assignation</label>
+      <label style={labelStyle}>{tr("task.assignMode")}</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {[["simple", "Personne fixe"], ["rotation", "En alternance"], ["routine", "Routine visuelle"]].map(([key, label]) => (
+        {[["simple", tr("task.mode.simple")], ["rotation", tr("task.mode.rotation")], ["routine", tr("task.mode.routine")]].map(([key, label]) => (
           <button type="button" key={key} onClick={() => setMode(key)} style={{
             flex: 1, padding: 10, borderRadius: 8, border: `1.5px solid ${mode === key ? COLORS.accentDark : "#D8D2BE"}`,
             background: mode === key ? COLORS.accentDark : "#fff", color: mode === key ? "#fff" : COLORS.ink, fontWeight: 600, fontSize: 13,
