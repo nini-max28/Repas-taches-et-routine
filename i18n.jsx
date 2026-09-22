@@ -110,6 +110,12 @@ const DICTIONARY = {
     "meal.takePhoto": "Prendre une photo ou choisir un fichier", "meal.removeFile": "Retirer le fichier",
     "meal.titleRequired": "Le titre est requis.", "meal.pdfTooLarge": "Ce PDF est trop volumineux (max ~4 Mo).",
     "meal.fileError": "Impossible de traiter ce fichier.",
+    // Formulaire Tâche (éléments partagés entre les 3 modes)
+    "task.edit": "Modifier la tâche", "task.new": "Nouvelle tâche", "task.title": "Tâche",
+    "task.titlePlaceholder": "Ex. Sortir les poubelles, Routine du matin…", "task.assignMode": "Mode d'assignation",
+    "task.mode.simple": "Personne fixe", "task.mode.rotation": "En alternance", "task.mode.routine": "Routine visuelle",
+    "task.titleRequired": "Le titre est requis.", "task.needOneStep": "Ajoutez au moins une étape à la routine.",
+    "task.needTwoPeople": "Choisissez au moins deux personnes pour l'alternance.",
   },
   en: {
     "landing.tagline": "Groceries, meals, and family tasks, without the hassle",
@@ -201,6 +207,11 @@ const DICTIONARY = {
     "meal.takePhoto": "Take a photo or choose a file", "meal.removeFile": "Remove file",
     "meal.titleRequired": "Title is required.", "meal.pdfTooLarge": "This PDF is too large (max ~4 MB).",
     "meal.fileError": "Could not process this file.",
+    "task.edit": "Edit task", "task.new": "New task", "task.title": "Task",
+    "task.titlePlaceholder": "E.g. Take out the trash, Morning routine…", "task.assignMode": "Assignment mode",
+    "task.mode.simple": "Fixed person", "task.mode.rotation": "Rotating", "task.mode.routine": "Visual routine",
+    "task.titleRequired": "Title is required.", "task.needOneStep": "Add at least one step to the routine.",
+    "task.needTwoPeople": "Choose at least two people for the rotation.",
   },
 };
 
