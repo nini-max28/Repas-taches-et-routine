@@ -2392,6 +2392,7 @@ function ItemModal({ onClose, onSave }) {
 }
 
 function MealModal({ meal, onClose, onSave }) {
+  const { t: tr } = useLanguage();
   const [title, setTitle] = useState(meal?.title || "");
   const [category, setCategory] = useState(meal?.category || "souper");
   const [tagsStr, setTagsStr] = useState((meal?.tags || []).join(", "));
@@ -2409,20 +2410,20 @@ function MealModal({ meal, onClose, onSave }) {
     setBusy(true); setErr("");
     try {
       if (file.type === "application/pdf") {
-        if (file.size > 4 * 1024 * 1024) { setErr("Ce PDF est trop volumineux (max ~4 Mo)."); setBusy(false); return; }
+        if (file.size > 4 * 1024 * 1024) { setErr(tr("meal.pdfTooLarge")); setBusy(false); return; }
         const dataUrl = await readAsDataUrl(file);
         setPhoto(dataUrl); setFileName(file.name);
       } else {
         const dataUrl = await resizeImage(file);
         setPhoto(dataUrl); setFileName(file.name);
       }
-    } catch { setErr("Impossible de traiter ce fichier."); }
+    } catch { setErr(tr("meal.fileError")); }
     setBusy(false);
   };
 
   const submit = (e) => {
     e.preventDefault();
-    if (!title.trim()) { setErr("Le titre est requis."); return; }
+    if (!title.trim()) { setErr(tr("meal.titleRequired")); return; }
     onSave({
       title: title.trim(), category,
       tags: tagsStr.split(",").map(s => s.trim()).filter(Boolean),
@@ -2436,30 +2437,30 @@ function MealModal({ meal, onClose, onSave }) {
   const isPdf = photo && photo.startsWith("data:application/pdf");
 
   return (
-    <ModalShell title={meal ? "Modifier l'idée" : "Nouvelle idée de repas"} onClose={onClose} onSubmit={submit}>
-      <label style={labelStyle}>Titre</label>
-      <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex. Poulet au four et légumes" autoFocus />
-      <label style={labelStyle}>Catégorie</label>
+    <ModalShell title={meal ? tr("meal.edit") : tr("meal.newIdea")} onClose={onClose} onSubmit={submit}>
+      <label style={labelStyle}>{tr("meal.title")}</label>
+      <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder={tr("meal.titlePlaceholder")} autoFocus />
+      <label style={labelStyle}>{tr("meal.category")}</label>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {[["souper", "Souper"], ["accompagnement", "Accompagnement"], ["lunch", "Lunch"], ["collation", "Collation"], ["marinade", "Marinade"], ["dessert", "Dessert"]].map(([key, label]) => (
+        {[["souper", tr("meal.cat.dinner")], ["accompagnement", tr("meal.cat.side")], ["lunch", tr("meal.cat.lunch")], ["collation", tr("meal.cat.snack")], ["marinade", tr("meal.cat.marinade")], ["dessert", tr("meal.cat.dessert")]].map(([key, label]) => (
           <button type="button" key={key} onClick={() => setCategory(key)} style={{
             flex: "1 1 30%", padding: 10, borderRadius: 8, border: `1.5px solid ${category === key ? COLORS.accentDark : "#D8D2BE"}`,
             background: category === key ? COLORS.accentDark : "#fff", color: category === key ? "#fff" : COLORS.ink, fontWeight: 600, fontSize: 13,
           }}>{label}</button>
         ))}
       </div>
-      <label style={labelStyle}>Étiquettes (séparées par virgules)</label>
-      <input style={inputStyle} value={tagsStr} onChange={e => setTagsStr(e.target.value)} placeholder="Ex. rapide, poulet, four" />
-      <label style={labelStyle}>Ingrédients (séparés par virgules)</label>
-      <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={ingredientsStr} onChange={e => setIngredientsStr(e.target.value)} placeholder="Ex. poulet, brocoli, riz, sauce soya" />
-      <label style={labelStyle}>Étapes de préparation (une par ligne, optionnel)</label>
-      <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={stepsStr} onChange={e => setStepsStr(e.target.value)} placeholder={"Ex.\nCuire le riz selon les instructions.\nFaire dorer le poulet 6-8 min.\nMélanger le tout et servir."} />
-      <label style={labelStyle}>Notes (optionnel)</label>
+      <label style={labelStyle}>{tr("meal.tags")}</label>
+      <input style={inputStyle} value={tagsStr} onChange={e => setTagsStr(e.target.value)} placeholder={tr("meal.tagsPlaceholder")} />
+      <label style={labelStyle}>{tr("meal.ingredients")}</label>
+      <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={ingredientsStr} onChange={e => setIngredientsStr(e.target.value)} placeholder={tr("meal.ingredientsPlaceholder")} />
+      <label style={labelStyle}>{tr("meal.steps")}</label>
+      <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={stepsStr} onChange={e => setStepsStr(e.target.value)} placeholder={tr("meal.stepsPlaceholder")} />
+      <label style={labelStyle}>{tr("meal.notes")}</label>
       <textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} />
 
-      <label style={labelStyle}>Photo de la recette ou PDF (optionnel)</label>
+      <label style={labelStyle}>{tr("meal.photoOrPdf")}</label>
       <p style={{ fontSize: 12, color: COLORS.muted, marginTop: -6, marginBottom: 8 }}>
-        Prenez une photo d'une recette de livre ou de magazine, ou téléversez un PDF — pas besoin de tout retaper.
+        {tr("meal.photoHelp")}
       </p>
       <label style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -2467,7 +2468,7 @@ function MealModal({ meal, onClose, onSave }) {
         color: COLORS.muted, fontSize: 13, marginBottom: 12, background: "#fff",
       }}>
         <Camera size={18} />
-        {busy ? "Traitement…" : photo ? `Ajouté : ${fileName || "fichier"} — toucher pour changer` : "Prendre une photo ou choisir un fichier"}
+        {busy ? tr("meal.processing") : photo ? `${tr("meal.addedFile")} : ${fileName || "fichier"} — ${tr("meal.tapToChange")}` : tr("meal.takePhoto")}
         <input type="file" accept="image/*,application/pdf" capture="environment" onChange={handleFile} style={{ display: "none" }} />
       </label>
       {photo && !isPdf && <img src={photo} alt="aperçu" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 12 }} />}
@@ -2479,12 +2480,12 @@ function MealModal({ meal, onClose, onSave }) {
       )}
       {photo && (
         <button type="button" onClick={() => { setPhoto(null); setFileName(""); }} style={{ ...outlineBtn, marginBottom: 12 }}>
-          <X size={14} /> Retirer le fichier
+          <X size={14} /> {tr("meal.removeFile")}
         </button>
       )}
 
       {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
-      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }} disabled={busy}><Check size={16} /> Enregistrer</button>
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }} disabled={busy}><Check size={16} /> {tr("action.save")}</button>
     </ModalShell>
   );
 }
