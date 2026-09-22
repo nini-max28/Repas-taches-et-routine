@@ -518,6 +518,7 @@ function Paywall({ familyInfo }) {
 // Fenêtre de compte — utilise le même "bottom sheet" fiable que les autres
 // fenêtres de l'app (plus robuste sur mobile qu'un petit menu déroulant).
 function AccountMenu({ session, familyInfo }) {
+  const { t: tr, lang } = useLanguage();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -532,24 +533,24 @@ function AccountMenu({ session, familyInfo }) {
         <UserCircle size={26} />
       </button>
       {open && (
-        <ModalShell title="Mon compte" onClose={() => setOpen(false)}>
+        <ModalShell title={tr("account.title")} onClose={() => setOpen(false)}>
           <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 16px", wordBreak: "break-all" }}>{session?.user?.email}</p>
 
           <div style={{ background: "#F0EAD8", borderRadius: 10, padding: 14, marginBottom: 16 }}>
             <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 10px" }}>
-              {isActive ? `✅ Abonnement actif (${familyInfo.plan === "annual" ? "annuel" : "mensuel"})`
-                : isPastDue ? "⚠️ Le dernier paiement a échoué"
-                : trialEndsAt && new Date(trialEndsAt) > new Date() ? `🕐 Essai gratuit — se termine le ${new Date(trialEndsAt).toLocaleDateString("fr-CA")}`
-                : "Aucun abonnement actif"}
+              {isActive ? `✅ ${tr("account.active")} (${familyInfo.plan === "annual" ? tr("plan.annual") : tr("plan.monthly")})`
+                : isPastDue ? tr("account.pastDue")
+                : trialEndsAt && new Date(trialEndsAt) > new Date() ? `${tr("account.trialEnds")} ${new Date(trialEndsAt).toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA")}`
+                : tr("account.noSubscription")}
             </p>
             {error && <p style={{ color: COLORS.danger, fontSize: 12, marginBottom: 10 }}>{error}</p>}
             <button type="button" disabled={busy} onClick={() => openBillingPortal(setBusy, setError)} style={{ ...outlineBtn, width: "100%" }}>
-              {isActive || isPastDue ? "Gérer mon abonnement" : "S'abonner"}
+              {isActive || isPastDue ? tr("account.manageSubscription") : tr("account.subscribe")}
             </button>
           </div>
 
           <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "none", border: `1.5px solid ${COLORS.danger}`, borderRadius: 8, padding: "10px 16px", color: COLORS.danger, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-            <LogOut size={15} /> Se déconnecter
+            <LogOut size={15} /> {tr("action.logout")}
           </button>
         </ModalShell>
       )}
@@ -1125,6 +1126,7 @@ function PinCard({ children: c }) {
   );
 }
 function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToday, onPick, onClear, onAddIngredients }) {
+  const { t: tr } = useLanguage();
   const planFor = (date) => weekPlan.find(p => p.date === date);
   const todayD = todayStr();
   return (
@@ -1132,7 +1134,7 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <button onClick={onPrevWeek} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronLeft size={16} color={COLORS.accentDark} /></button>
         <button onClick={onToday} className="hand" style={{ fontSize: 20, background: "none", border: "none", color: COLORS.ink, cursor: "pointer" }}>
-          Semaine du {fmtDayLabel(weekDates[0]).split(" ").slice(1).join(" ")}
+          {tr("week.weekOf")} {fmtDayLabel(weekDates[0]).split(" ").slice(1).join(" ")}
         </button>
         <button onClick={onNextWeek} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronRight size={16} color={COLORS.accentDark} /></button>
       </div>
@@ -1167,15 +1169,15 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", flex: 1 }}>Aucun repas</div>
+                  <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", flex: 1 }}>{tr("week.noMeal")}</div>
                 )}
                 <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                   <button onClick={() => onPick(date)} style={{ ...outlineBtn, padding: "6px 8px", fontSize: 11, justifyContent: "center" }}>
-                    {title ? <Pencil size={11} /> : <Plus size={11} />} {title ? "Changer" : "Choisir"}
+                    {title ? <Pencil size={11} /> : <Plus size={11} />} {title ? tr("week.change") : tr("week.choose")}
                   </button>
                   {meal?.ingredients?.length > 0 && (
                     <button onClick={() => onAddIngredients(meal)} style={{ ...outlineBtn, padding: "6px 8px", fontSize: 11, justifyContent: "center" }}>
-                      <ShoppingCart size={11} /> Épicerie
+                      <ShoppingCart size={11} /> {tr("nav.grocery")}
                     </button>
                   )}
                 </div>
@@ -1190,6 +1192,7 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
 
 
 function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, onReset }) {
+  const { t: tr } = useLanguage();
   const grouped = AISLES.map(a => ({ ...a, items: items.filter(i => i.aisle === a.id) })).filter(a => a.items.length > 0);
   const hasChecked = items.some(i => i.checked);
   const [sending, setSending] = useState(false);
@@ -1224,17 +1227,17 @@ function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
-        <button onClick={onAdd} style={primaryBtn}><Plus size={16} /> Ajouter un article</button>
+        <button onClick={onAdd} style={primaryBtn}><Plus size={16} /> {tr("grocery.addItem")}</button>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {hasChecked && <button onClick={onClearChecked} style={outlineBtn}><Trash2 size={14} /> Effacer les cochés</button>}
-          {items.length > 0 && <button onClick={handleReset} style={{ ...outlineBtn, borderColor: COLORS.danger, color: COLORS.danger }}><RefreshCw size={14} /> Réinitialiser la liste</button>}
+          {hasChecked && <button onClick={onClearChecked} style={outlineBtn}><Trash2 size={14} /> {tr("grocery.clearChecked")}</button>}
+          {items.length > 0 && <button onClick={handleReset} style={{ ...outlineBtn, borderColor: COLORS.danger, color: COLORS.danger }}><RefreshCw size={14} /> {tr("grocery.resetList")}</button>}
           <button onClick={sendList} style={outlineBtn} disabled={sending}>
-            <Send size={14} /> {sending ? "Envoi…" : "Envoyer par SMS"}
+            <Send size={14} /> {sending ? tr("grocery.sending") : tr("grocery.sendSms")}
           </button>
         </div>
       </div>
       {sendMsg && <p style={{ fontSize: 12.5, color: COLORS.muted, marginBottom: 14 }}>{sendMsg}</p>}
-      {items.length === 0 && <EmptyState text="Liste vide. Ajoutez un article, ou glissez des ingrédients depuis l'onglet Semaine." />}
+      {items.length === 0 && <EmptyState text={tr("grocery.empty")} />}
       {grouped.map(g => (
         <div key={g.id} style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
@@ -1261,6 +1264,7 @@ function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, 
 }
 
 function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, onAddSideDishes, onAddMoreMarinades, onEdit, onDelete }) {
+  const { t: tr } = useLanguage();
   const [catFilter, setCatFilter] = useState("tous");
   const [tagFilter, setTagFilter] = useState("tous");
   const allTags = useMemo(() => Array.from(new Set(meals.flatMap(m => m.tags || []))).sort(), [meals]);
@@ -1275,15 +1279,15 @@ function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, o
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        {!hasMarinades && <button onClick={onAddMarinades} style={outlineBtn}><Plus size={16} /> Ajouter des marinades</button>}
-        {hasMarinades && !hasMoreMarinades && <button onClick={onAddMoreMarinades} style={outlineBtn}><Plus size={16} /> Plus de marinades (poulet, bœuf)</button>}
-        {!hasSnacks && <button onClick={onAddSnacks} style={outlineBtn}><Plus size={16} /> Ajouter des collations</button>}
-        {!hasPickyLunches && <button onClick={onAddPickyLunches} style={outlineBtn}><Plus size={16} /> Ajouter des lunchs (enfant difficile)</button>}
-        {!hasSideDishes && <button onClick={onAddSideDishes} style={outlineBtn}><Plus size={16} /> Ajouter des accompagnements</button>}
-        <button onClick={onAdd} style={primaryBtn}><Plus size={16} /> Nouvelle idée</button>
+        {!hasMarinades && <button onClick={onAddMarinades} style={outlineBtn}><Plus size={16} /> {tr("meals.addMarinades")}</button>}
+        {hasMarinades && !hasMoreMarinades && <button onClick={onAddMoreMarinades} style={outlineBtn}><Plus size={16} /> {tr("meals.moreMarinades")}</button>}
+        {!hasSnacks && <button onClick={onAddSnacks} style={outlineBtn}><Plus size={16} /> {tr("meals.addSnacks")}</button>}
+        {!hasPickyLunches && <button onClick={onAddPickyLunches} style={outlineBtn}><Plus size={16} /> {tr("meals.addPickyLunches")}</button>}
+        {!hasSideDishes && <button onClick={onAddSideDishes} style={outlineBtn}><Plus size={16} /> {tr("meals.addSideDishes")}</button>}
+        <button onClick={onAdd} style={primaryBtn}><Plus size={16} /> {tr("meals.newIdea")}</button>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-        {[["tous", "Tous"], ["souper", "Soupers"], ["accompagnement", "Accompagnements"], ["lunch", "Lunchs"], ["collation", "Collations"], ["marinade", "Marinades"], ["dessert", "Desserts"]].map(([key, label]) => (
+        {[["tous", tr("meals.cat.all")], ["souper", tr("meals.cat.dinner")], ["accompagnement", tr("meals.cat.side")], ["lunch", tr("meals.cat.lunch")], ["collation", tr("meals.cat.snack")], ["marinade", tr("meals.cat.marinade")], ["dessert", tr("meals.cat.dessert")]].map(([key, label]) => (
           <button key={key} onClick={() => setCatFilter(key)} style={{
             padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${COLORS.accentDark}`,
             background: catFilter === key ? COLORS.accentDark : "transparent", color: catFilter === key ? "#fff" : COLORS.accentDark,
@@ -1295,7 +1299,7 @@ function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, o
         <button onClick={() => setTagFilter("tous")} style={{
           padding: "5px 10px", borderRadius: 20, border: "1px solid #D8D2BE",
           background: tagFilter === "tous" ? "#F0EAD8" : "#fff", color: COLORS.muted, fontSize: 11.5, cursor: "pointer",
-        }}>Toutes étiquettes</button>
+        }}>{tr("meals.allTags")}</button>
         {allTags.map(t => (
           <button key={t} onClick={() => setTagFilter(t)} style={{
             padding: "5px 10px", borderRadius: 20, border: "1px solid #D8D2BE",
@@ -1303,7 +1307,7 @@ function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, o
           }}>{t}</button>
         ))}
       </div>
-      {filtered.length === 0 && <EmptyState text="Aucune idée pour ces filtres." />}
+      {filtered.length === 0 && <EmptyState text={tr("meals.noResults")} />}
       {filtered.map(m => (
         <RecipeCard key={m.id} meal={m} onEdit={() => onEdit(m)} onDelete={() => onDelete(m.id)} />
       ))}
@@ -1312,6 +1316,7 @@ function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, o
 }
 
 function RecipeCard({ meal: m, onEdit, onDelete }) {
+  const { t: tr } = useLanguage();
   const [showSteps, setShowSteps] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   return (
@@ -1324,7 +1329,7 @@ function RecipeCard({ meal: m, onEdit, onDelete }) {
           </div>
           {m.ingredients?.length > 0 && (
             <>
-              <div className="mono" style={{ fontSize: 10, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>Pour 6 personnes</div>
+              <div className="mono" style={{ fontSize: 10, color: COLORS.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>{tr("meals.servings")}</div>
               <div style={{ fontSize: 12.5, color: COLORS.muted }}>
                 {m.ingredients.map((i, idx) => (
                   <span key={idx}>{i.name}{i.quantity ? ` (${i.quantity})` : ""}{idx < m.ingredients.length - 1 ? " · " : ""}</span>
@@ -1397,6 +1402,7 @@ function MemberAvatar({ member, size = 32 }) {
 }
 
 function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myMemberId, onAddTask, onEditTask, onDeleteTask, onToggleTask, onRotateTask, onCoverAbsence, onToggleRoutineStep, rewardCharts, onAddReward, onEditReward, onDeleteReward, onMarkNight, onUndoNight, onSetReward }) {
+  const { t: tr } = useLanguage();
   const [coveringFor, setCoveringFor] = useState(null); // id de la tâche pour laquelle on choisit qui a couvert
   const [filter, setFilter] = useState(myMemberId || "all");
   const memberById = (id) => members.find(m => m.id === id);
@@ -1484,9 +1490,9 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, gap: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={onAddMember} style={outlineBtn}><UserPlus size={14} /> Membre</button>
-          <button onClick={onAddReward} style={outlineBtn}><Sparkles size={14} /> Défi récompense</button>
-          <button onClick={onAddTask} style={primaryBtn}><Plus size={16} /> Nouvelle tâche</button>
+          <button onClick={onAddMember} style={outlineBtn}><UserPlus size={14} /> {tr("tasks.member")}</button>
+          <button onClick={onAddReward} style={outlineBtn}><Sparkles size={14} /> {tr("tasks.rewardChart")}</button>
+          <button onClick={onAddTask} style={primaryBtn}><Plus size={16} /> {tr("tasks.newTask")}</button>
         </div>
       </div>
 
@@ -1496,7 +1502,7 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
             padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${COLORS.accentDark}`,
             background: filter === "all" ? COLORS.accentDark : "transparent", color: filter === "all" ? "#fff" : COLORS.accentDark,
             fontWeight: 600, fontSize: 12.5, cursor: "pointer",
-          }}>Tous</button>
+          }}>{tr("tasks.all")}</button>
           {members.map(m => (
             <button key={m.id} onClick={() => setFilter(m.id)} style={{
               padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${m.color}`,
@@ -1511,14 +1517,14 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
       )}
 
       {members.length === 0 && (
-        <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 14 }}>Ajoutez d'abord vos enfants comme membres pour pouvoir leur assigner des tâches.</p>
+        <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 14 }}>{tr("tasks.addMembersFirst")}</p>
       )}
 
-      {tasks.length === 0 && rewardCharts.length === 0 && <EmptyState text="Aucune tâche. Ajoutez la première corvée à faire, une routine visuelle, ou un défi récompense." />}
+      {tasks.length === 0 && rewardCharts.length === 0 && <EmptyState text={tr("tasks.empty")} />}
 
       {rewardCharts.filter(c => filter === "all" || c.memberId === filter).length > 0 && (
         <div style={{ marginBottom: 22 }}>
-          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 8 }}>Défis récompense</div>
+          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 8 }}>{tr("tasks.sectionRewards")}</div>
           {rewardCharts.filter(c => filter === "all" || c.memberId === filter).map(c => (
             <RewardChartCard key={c.id} chart={c} member={memberById(c.memberId)}
               onMarkNight={() => onMarkNight(c)} onUndoNight={() => onUndoNight(c)}
@@ -1529,7 +1535,7 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
 
       {routines.length > 0 && (
         <div style={{ marginBottom: 22 }}>
-          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 8 }}>Routines</div>
+          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 8 }}>{tr("tasks.sectionRoutines")}</div>
           {routines.map(t => (
             <RoutineGrid key={t.id} task={t} member={memberById(t.assignedTo)}
               onToggleStep={(stepId) => onToggleRoutineStep(t, stepId)}
@@ -1540,11 +1546,11 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
 
       {chores.length > 0 && (
         <>
-          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>Tâches</div>
+          <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>{tr("tasks.sectionTasks")}</div>
           {active.length > 0 && active.map(renderTask)}
-          {active.length === 0 && <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>Tout est fait 🎉</p>}
+          {active.length === 0 && <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>{tr("tasks.allDone")}</p>}
           {done.length > 0 && <>
-            <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", margin: "16px 0 6px" }}>Fait</div>
+            <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", margin: "16px 0 6px" }}>{tr("tasks.sectionDone")}</div>
             {done.map(renderTask)}
           </>}
         </>
@@ -2101,7 +2107,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
   return (
     <div>
-      <Card title="Backend de synchronisation">
+      <Card title={tr("settings.syncBackend")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Utilisez la même adresse sur le téléphone de votre conjoint·e pour partager la liste et le plan de repas.
         </p>
@@ -2111,7 +2117,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         {testResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{testResult}</p>}
       </Card>
 
-      <Card title="Numéros pour recevoir la liste par SMS">
+      <Card title={tr("settings.smsNumbers")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Format international, ex. +15145551234. Le bouton "Envoyer par SMS" de l'onglet Épicerie texte la liste (articles non cochés) à tous les numéros remplis ci-dessous.
         </p>
@@ -2125,7 +2131,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         <input style={inputStyle} value={form.phone4 || ""} onChange={e => setForm({ ...form, phone4: e.target.value })} placeholder="+15145551234" />
       </Card>
 
-      <Card title="Canal des alertes de tâches">
+      <Card title={tr("settings.taskAlertChannel")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Comment vos enfants reçoivent-elles les alertes de tour de tâche et les relances?
         </p>
@@ -2143,7 +2149,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </div>
       </Card>
 
-      <Card title="Notifications sur l'appareil, par enfant">
+      <Card title={tr("settings.deviceNotifications")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Chaque enfant doit se choisir elle-même dans la liste ci-dessous, sur son <strong>propre téléphone</strong> — ça sert à la fois pour les notifications et pour que l'onglet Tâches ne lui montre que ses propres tâches par défaut. Ce choix est propre à cet appareil et ne touche jamais aux autres.
         </p>
@@ -2170,7 +2176,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         )}
       </Card>
 
-      <Card title="Ceci est l'appareil d'un parent">
+      <Card title={tr("settings.parentDevice")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Si ce téléphone est le vôtre (pas celui d'un enfant) et que vous avez testé les notifications par erreur, touchez ce bouton pour être certain de ne plus jamais recevoir d'alertes de tâches destinées aux enfants — ça désabonne complètement cet appareil.
         </p>
@@ -2179,7 +2185,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </button>
       </Card>
 
-      <Card title="Heures de classe">
+      <Card title={tr("settings.classHours")}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
           <input type="checkbox" checked={form.schoolHoursEnabled !== false} onChange={e => setForm({ ...form, schoolHoursEnabled: e.target.checked })} />
           <span style={{ fontSize: 13.5, fontWeight: 600 }}>Ne pas envoyer d'alerte de tâche pendant les heures de classe</span>
@@ -2205,7 +2211,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         )}
       </Card>
 
-      <Card title="Horaire des relances">
+      <Card title={tr("settings.reminderSchedule")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Pour une tâche (ou un tour) toujours pas faite. En semaine : trois moments fixes. La fin de semaine, sans heures de classe : plusieurs rappels espacés dans la journée.
         </p>
@@ -2256,7 +2262,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
       <button type="button" onClick={() => onSave({ ...form, backendUrl: cleanBackendUrl(form.backendUrl) })} style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px", marginBottom: 16 }}>
         <Check size={16} /> Enregistrer les paramètres
       </button>
-      <Card title="Synchronisation de cet appareil">
+      <Card title={tr("settings.deviceSync")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
           Cet appareil a <strong>{itemsCount}</strong> article(s) d'épicerie et <strong>{mealsCount}</strong> idée(s) de repas en mémoire locale.
         </p>
@@ -2282,42 +2288,42 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </div>
       </Card>
 
-      <Card title="Abonnement">
+      <Card title={tr("settings.subscription")}>
         {familyInfo?.subscriptionStatus === "active" ? (
           <>
             <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-              ✅ Abonnement actif ({familyInfo.plan === "annual" ? "annuel" : "mensuel"})
+              ✅ {tr("account.active")} ({familyInfo.plan === "annual" ? tr("plan.annual") : tr("plan.monthly")})
             </p>
             <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={outlineBtn}>
-              Gérer mon abonnement
+              {tr("account.manageSubscription")}
             </button>
           </>
         ) : familyInfo?.subscriptionStatus === "past_due" ? (
           <>
             <p style={{ fontSize: 12.5, color: COLORS.danger, marginTop: 0, marginBottom: 12 }}>
-              ⚠️ Le dernier paiement a échoué — mettez votre carte à jour pour éviter une interruption.
+              {tr("billing.paymentFailedLong")}
             </p>
             <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={primaryBtn}>
-              Mettre à jour mon moyen de paiement
+              {tr("billing.updatePayment")}
             </button>
           </>
         ) : (
           <>
             <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
               {familyInfo?.trialEndsAt && new Date(familyInfo.trialEndsAt) > new Date()
-                ? `🕐 Essai gratuit — se termine le ${new Date(familyInfo.trialEndsAt).toLocaleDateString("fr-CA")}`
-                : "Votre essai est terminé."}
+                ? `${tr("account.trialEnds")} ${new Date(familyInfo.trialEndsAt).toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA")}`
+                : tr("billing.trialEnded")}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError, onRefresh)} style={primaryBtn}>S'abonner — mensuel</button>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError, onRefresh)} style={outlineBtn}>S'abonner — annuel</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError, onRefresh)} style={primaryBtn}>{tr("billing.subscribeMonthly")}</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError, onRefresh)} style={outlineBtn}>{tr("billing.subscribeAnnual")}</button>
             </div>
           </>
         )}
         {billingError && <p style={{ color: COLORS.danger, fontSize: 12.5, marginTop: 10 }}>{billingError}</p>}
       </Card>
 
-      <Card title="Sauvegarde locale">
+      <Card title={tr("settings.localBackup")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           Un fichier de sauvegarde téléchargé sur cet appareil, indépendant du serveur — un filet de sécurité supplémentaire. Faites-en une de temps en temps, surtout après avoir bâti une routine ou un défi récompense.
         </p>
@@ -2334,7 +2340,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         </p>
       </Card>
 
-      <Card title="Relances des tâches en alternance">
+      <Card title={tr("settings.taskReminders")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
           Un texto est envoyé automatiquement chaque jour (18h par défaut) à qui a une tâche en retard, jusqu'à 3 fois par tour.
         </p>
@@ -2363,23 +2369,24 @@ const inputStyle = { width: "100%", padding: "10px 12px", borderRadius: 8, borde
 const labelStyle = { fontSize: 12, fontWeight: 600, color: COLORS.muted, marginBottom: 5, display: "block" };
 
 function ItemModal({ onClose, onSave }) {
+  const { t: tr } = useLanguage();
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [aisle, setAisle] = useState("autres");
   const [err, setErr] = useState("");
-  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr("Le nom est requis."); return; } onSave({ name: name.trim(), quantity: quantity.trim(), aisle }); };
+  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr(tr("item.nameRequired")); return; } onSave({ name: name.trim(), quantity: quantity.trim(), aisle }); };
   return (
-    <ModalShell title="Ajouter un article" onClose={onClose} onSubmit={submit}>
-      <label style={labelStyle}>Article</label>
-      <input style={inputStyle} value={name} onChange={e => { setName(e.target.value); if (aisle === "autres") setAisle(guessAisle(e.target.value)); }} placeholder="Ex. Lait, Pommes, Poulet…" autoFocus />
-      <label style={labelStyle}>Quantité (optionnel)</label>
-      <input style={inputStyle} value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="Ex. 2 L, 1 sac" />
-      <label style={labelStyle}>Rayon</label>
+    <ModalShell title={tr("item.add")} onClose={onClose} onSubmit={submit}>
+      <label style={labelStyle}>{tr("item.name")}</label>
+      <input style={inputStyle} value={name} onChange={e => { setName(e.target.value); if (aisle === "autres") setAisle(guessAisle(e.target.value)); }} placeholder={tr("item.namePlaceholder")} autoFocus />
+      <label style={labelStyle}>{tr("item.quantityOptional")}</label>
+      <input style={inputStyle} value={quantity} onChange={e => setQuantity(e.target.value)} placeholder={tr("item.quantityPlaceholder")} />
+      <label style={labelStyle}>{tr("item.aisle")}</label>
       <select style={inputStyle} value={aisle} onChange={e => setAisle(e.target.value)}>
         {AISLES.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
       </select>
       {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
-      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> Ajouter</button>
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {tr("action.add")}</button>
     </ModalShell>
   );
 }
@@ -2521,31 +2528,32 @@ function PickMealModal({ date, meals, weekDates, weekPlan, onClose, onPick }) {
 }
 
 function MemberModal({ member, onClose, onSave }) {
+  const { t: tr } = useLanguage();
   const [name, setName] = useState(member?.name || "");
   const [phone, setPhone] = useState(member?.phone || "");
   const [kidMode, setKidMode] = useState(member?.kidMode || false);
   const [err, setErr] = useState("");
-  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr("Le prénom est requis."); return; } onSave({ name: name.trim(), phone: phone.trim(), kidMode }); };
+  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr(tr("member.nameRequired")); return; } onSave({ name: name.trim(), phone: phone.trim(), kidMode }); };
   return (
-    <ModalShell title={member ? "Modifier le membre" : "Ajouter un membre"} onClose={onClose} onSubmit={submit}>
-      <label style={labelStyle}>Prénom</label>
-      <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Prénom de l'enfant" autoFocus />
-      <label style={labelStyle}>Numéro de cellulaire (optionnel)</label>
+    <ModalShell title={member ? tr("member.edit") : tr("member.add")} onClose={onClose} onSubmit={submit}>
+      <label style={labelStyle}>{tr("member.firstName")}</label>
+      <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder={tr("member.firstNamePlaceholder")} autoFocus />
+      <label style={labelStyle}>{tr("member.phoneOptional")}</label>
       <input style={inputStyle} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+15145551234" />
       <p style={{ fontSize: 12, color: COLORS.muted, marginTop: -4, marginBottom: 14 }}>
-        Si rempli, elle reçoit un texto dès que c'est son tour pour une tâche en alternance.
+        {tr("member.phoneHelp")}
       </p>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#F0EAD8", borderRadius: 8, marginBottom: 14, cursor: "pointer" }}>
         <input type="checkbox" checked={kidMode} onChange={e => setKidMode(e.target.checked)} style={{ marginTop: 2 }} />
         <span>
-          <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>Accès restreint (vue simplifiée)</span>
+          <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{tr("member.restrictedAccess")}</span>
           <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
-            Sur l'appareil de cet enfant, l'app ne montre que ses routines et ses défis récompense en grand — pas les Réglages ni les autres onglets.
+            {tr("member.restrictedHelp")}
           </span>
         </span>
       </label>
       {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
-      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {member ? "Enregistrer" : "Ajouter"}</button>
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {member ? tr("action.save") : tr("action.add")}</button>
     </ModalShell>
   );
 }
