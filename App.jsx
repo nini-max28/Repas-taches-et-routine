@@ -2699,18 +2699,18 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
           </p>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={newStepLabel} onChange={e => setNewStepLabel(e.target.value)}
-              placeholder="Ex. Brosser les dents" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addStep(); } }} />
+              placeholder={tr("task.newStepPlaceholder")} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addStep(); } }} />
             <button type="button" onClick={addStep} style={outlineBtn}><Plus size={16} /></button>
           </div>
         </>
       ) : mode === "simple" ? (
         <>
-          <label style={labelStyle}>Assignée à</label>
+          <label style={labelStyle}>{tr("task.assignedTo")}</label>
           <select style={inputStyle} value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
-            <option value="">Non assignée</option>
+            <option value="">{tr("task.notAssigned")}</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
-          <label style={labelStyle}>Fréquence</label>
+          <label style={labelStyle}>{tr("task.frequency")}</label>
           <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
             {Object.entries(TASK_FREQUENCIES).map(([key, label]) => (
               <button type="button" key={key} onClick={() => setFrequency(key)} style={{
@@ -2721,18 +2721,18 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
           </div>
           {frequency === "unique" && (
             <>
-              <label style={labelStyle}>Date (optionnel)</label>
+              <label style={labelStyle}>{tr("task.dateOptional")}</label>
               <input type="date" style={inputStyle} value={dueDate} onChange={e => setDueDate(e.target.value)} />
             </>
           )}
           {(frequency === "hebdomadaire" || frequency === "auxDeuxSemaines") && (
             <>
-              <label style={labelStyle}>Jour de la semaine (optionnel)</label>
+              <label style={labelStyle}>{tr("task.dayOfWeekOptional")}</label>
               <div style={{ display: "flex", gap: 5, marginBottom: 6, flexWrap: "wrap" }}>
                 <button type="button" onClick={() => setDueDayOfWeek("")} style={{
                   padding: "6px 10px", borderRadius: 8, border: dueDayOfWeek === "" ? `1.5px solid ${COLORS.accentDark}` : "1.5px solid #D8D2BE",
                   background: dueDayOfWeek === "" ? COLORS.accentDark : "#fff", color: dueDayOfWeek === "" ? "#fff" : COLORS.ink, fontSize: 12, fontWeight: 600,
-                }}>N'importe</button>
+                }}>{tr("task.any")}</button>
                 {DAY_NAMES.map((name, i) => (
                   <button type="button" key={i} onClick={() => setDueDayOfWeek(i)} style={{
                     padding: "6px 10px", borderRadius: 8, border: dueDayOfWeek === i ? `1.5px solid ${COLORS.accentDark}` : "1.5px solid #D8D2BE",
@@ -2750,8 +2750,8 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
         </>
       ) : (
         <>
-          <label style={labelStyle}>Personnes (dans l'ordre du tour)</label>
-          {members.length === 0 && <p style={{ fontSize: 12.5, color: COLORS.muted }}>Ajoutez d'abord des membres.</p>}
+          <label style={labelStyle}>{tr("task.peopleInOrder")}</label>
+          {members.length === 0 && <p style={{ fontSize: 12.5, color: COLORS.muted }}>{tr("task.addMembersFirst2")}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
             {members.map(m => {
               const pos = rotation.indexOf(m.id);
@@ -2769,11 +2769,11 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
             })}
           </div>
           <p style={{ fontSize: 12, color: COLORS.muted, marginTop: -4, marginBottom: 12 }}>
-            Chaque fois que la personne dont c'est le tour coche la tâche, le tour passe automatiquement à la suivante.
+            {tr("task.rotationHelp")}
           </p>
-          <label style={labelStyle}>Faire aussi tourner automatiquement</label>
+          <label style={labelStyle}>{tr("task.autoRotate")}</label>
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-            {[["", "Manuel seulement"], ["quotidien", "Chaque jour"], ["hebdomadaire", "Chaque semaine"], ["auxDeuxSemaines", "Aux 2 semaines"]].map(([key, label]) => (
+            {[["", tr("task.manual")], ["quotidien", tr("task.daily")], ["hebdomadaire", tr("task.weekly")], ["auxDeuxSemaines", tr("task.biweekly")]].map(([key, label]) => (
               <button type="button" key={key || "manuel"} onClick={() => setRotationAuto(key)} style={{
                 padding: "7px 11px", borderRadius: 8, border: rotationAuto === key ? `1.5px solid ${COLORS.accentDark}` : "1.5px solid #D8D2BE",
                 background: rotationAuto === key ? COLORS.accentDark : "#fff", color: rotationAuto === key ? "#fff" : COLORS.ink, fontSize: 12.5, fontWeight: 600,
@@ -2787,12 +2787,12 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
           </p>
           {rotationAuto === "hebdomadaire" && (
             <>
-              <label style={labelStyle}>Jour du changement de tour (optionnel)</label>
+              <label style={labelStyle}>{tr("task.rotationDayOptional")}</label>
               <div style={{ display: "flex", gap: 5, marginBottom: 6, flexWrap: "wrap" }}>
                 <button type="button" onClick={() => setRotationDayOfWeek("")} style={{
                   padding: "6px 10px", borderRadius: 8, border: rotationDayOfWeek === "" ? `1.5px solid ${COLORS.accentDark}` : "1.5px solid #D8D2BE",
                   background: rotationDayOfWeek === "" ? COLORS.accentDark : "#fff", color: rotationDayOfWeek === "" ? "#fff" : COLORS.ink, fontSize: 12, fontWeight: 600,
-                }}>7 jours après le début</button>
+                }}>{tr("task.sevenDaysAfter")}</button>
                 {DAY_NAMES.map((name, i) => (
                   <button type="button" key={i} onClick={() => setRotationDayOfWeek(i)} style={{
                     padding: "6px 10px", borderRadius: 8, border: rotationDayOfWeek === i ? `1.5px solid ${COLORS.accentDark}` : "1.5px solid #D8D2BE",
@@ -2811,15 +2811,15 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#F0EAD8", borderRadius: 8, marginBottom: 14, cursor: "pointer" }}>
         <input type="checkbox" checked={notifyParent} onChange={e => setNotifyParent(e.target.checked)} style={{ marginTop: 2 }} />
         <span>
-          <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>Aussi avertir un parent</span>
+          <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{tr("task.alsoNotifyParent")}</span>
           <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
-            Envoie une copie SMS aux numéros de la famille (Réglages) en plus de l'alerte à l'enfant — utile pour un jeune enfant, en filet de sécurité.
+            {tr("task.notifyParentHelp")}
           </span>
         </span>
       </label>
 
       {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
-      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> Enregistrer</button>
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {tr("action.save")}</button>
     </ModalShell>
   );
 }
