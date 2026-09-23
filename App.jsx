@@ -345,21 +345,21 @@ async function loadTable(table, orderBy) {
   return (data || []).map(rowToCamel);
 }
 
-async function insertRow(table, familyId, obj) {
+async function insertRow(table, familyId, obj, errorsOut) {
   const payload = objToSnake({ ...obj, familyId });
   const { data, error } = await supabase.from(table).insert(payload).select().single();
-  if (error) { console.error(`Erreur ajout ${table}:`, error.message); return null; }
+  if (error) { console.error(`Erreur ajout ${table}:`, error.message); if (errorsOut) errorsOut.push(`${table}: ${error.message}`); return null; }
   return rowToCamel(data);
 }
-async function updateRow(table, id, patch) {
+async function updateRow(table, id, patch, errorsOut) {
   const payload = objToSnake(patch);
   const { error } = await supabase.from(table).update(payload).eq("id", id);
-  if (error) { console.error(`Erreur modification ${table}:`, error.message); return false; }
+  if (error) { console.error(`Erreur modification ${table}:`, error.message); if (errorsOut) errorsOut.push(`${table}: ${error.message}`); return false; }
   return true;
 }
-async function deleteRow(table, id) {
+async function deleteRow(table, id, errorsOut) {
   const { error } = await supabase.from(table).delete().eq("id", id);
-  if (error) { console.error(`Erreur suppression ${table}:`, error.message); return false; }
+  if (error) { console.error(`Erreur suppression ${table}:`, error.message); if (errorsOut) errorsOut.push(`${table}: ${error.message}`); return false; }
   return true;
 }
 async function upsertSettings(familyId, patch) {
@@ -372,21 +372,23 @@ async function upsertSettings(familyId, patch) {
 // Compare l'ancien tableau au nouveau et n'envoie à Supabase que ce qui a
 // vraiment changé (ajouts, modifications, suppressions) — ça évite de devoir
 // réécrire chacune des dizaines de fonctions qui ajoutent/modifient/suppriment
-// un article, une tâche, etc. dans le reste de l'app.
-async function syncArrayDiff(table, prevArr, nextArr, familyId) {
+// un article, une tâche, etc. dans le reste de l'app. Si "errorsOut" est fourni
+// (un tableau), le vrai message d'erreur de Supabase y est ajouté pour chaque
+// échec, au lieu de rester caché dans la console.
+async function syncArrayDiff(table, prevArr, nextArr, familyId, errorsOut) {
   const prevById = new Map(prevArr.map(x => [x.id, x]));
   const nextIds = new Set(nextArr.map(x => x.id));
   let failures = 0;
 
   for (const item of prevArr) {
-    if (!nextIds.has(item.id)) { if (!(await deleteRow(table, item.id))) failures++; }
+    if (!nextIds.has(item.id)) { if (!(await deleteRow(table, item.id, errorsOut))) failures++; }
   }
   for (const item of nextArr) {
     const prevItem = prevById.get(item.id);
     if (!prevItem) {
-      if (!(await insertRow(table, familyId, item))) failures++;
+      if (!(await insertRow(table, familyId, item, errorsOut))) failures++;
     } else if (JSON.stringify(prevItem) !== JSON.stringify(item)) {
-      if (!(await updateRow(table, item.id, item))) failures++;
+      if (!(await updateRow(table, item.id, item, errorsOut))) failures++;
     }
   }
   return failures;
@@ -759,17 +761,19 @@ function App({ session }) {
       const tk = data.tasks || [];
       const rc = data.rewardCharts || [];
 
+      const importErrors = [];
       const totalFailures =
-        (await syncArrayDiff("grocery_items", groceryItems, gi, familyId)) +
-        (await syncArrayDiff("meal_ideas", mealIdeas, mi, familyId)) +
-        (await syncArrayDiff("week_plan", weekPlan, wp, familyId)) +
-        (await syncArrayDiff("members", members, mb, familyId)) +
-        (await syncArrayDiff("reward_charts", rewardCharts, rc, familyId)) +
-        (await syncArrayDiff("tasks", tasks, tk, familyId));
+        (await syncArrayDiff("grocery_items", groceryItems, gi, familyId, importErrors)) +
+        (await syncArrayDiff("meal_ideas", mealIdeas, mi, familyId, importErrors)) +
+        (await syncArrayDiff("week_plan", weekPlan, wp, familyId, importErrors)) +
+        (await syncArrayDiff("members", members, mb, familyId, importErrors)) +
+        (await syncArrayDiff("reward_charts", rewardCharts, rc, familyId, importErrors)) +
+        (await syncArrayDiff("tasks", tasks, tk, familyId, importErrors));
 
       setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc);
       if (totalFailures > 0) {
-        window.alert(`Import terminé, mais ${totalFailures} élément(s) n'ont pas pu être enregistrés sur le serveur — ils pourraient disparaître au prochain rafraîchissement. Réessayez, ou contactez le soutien si ça persiste.`);
+        const uniqueErrors = [...new Set(importErrors)].slice(0, 3).join("\n");
+        window.alert(`Import terminé, mais ${totalFailures} élément(s) n'ont pas pu être enregistrés sur le serveur.\n\nDétail :\n${uniqueErrors}`);
       }
       return true;
     } catch {
