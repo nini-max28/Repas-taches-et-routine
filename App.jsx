@@ -626,11 +626,16 @@ function App({ session }) {
   const [unlocked, setUnlocked] = useState(false);
   const tapCountRef = useRef({ count: 0, last: 0 });
   const lastLocalWriteRef = useRef(0);
+  // Empêche le rafraîchissement automatique (minuterie ou retour de focus, ex.
+  // après le sélecteur de fichiers sur iPhone) d'écraser un import ou un envoi
+  // massif de données pendant qu'il est encore en train de travailler.
+  const bulkWriteInProgressRef = useRef(false);
 
   const [familyId, setFamilyId] = useState(null);
   const [familyInfo, setFamilyInfo] = useState(null); // { subscriptionStatus, trialEndsAt, plan, stripeCustomerId }
 
   const loadAll = useCallback(async () => {
+    if (bulkWriteInProgressRef.current) return; // un import/envoi massif est en cours, on ne le dérange pas
     const famId = await getMyFamilyId();
     setFamilyId(famId);
     if (!famId) { setLoaded(true); return; }
@@ -705,13 +710,18 @@ function App({ session }) {
   // si un import de sauvegarde a laissé les choses dans un état incohérent.
   const forcePushAll = async () => {
     if (!familyId) return false;
-    await syncArrayDiff("grocery_items", [], groceryItems, familyId);
-    await syncArrayDiff("meal_ideas", [], mealIdeas, familyId);
-    await syncArrayDiff("week_plan", [], weekPlan, familyId);
-    await syncArrayDiff("members", [], members, familyId);
-    await syncArrayDiff("reward_charts", [], rewardCharts, familyId);
-    await syncArrayDiff("tasks", [], tasks, familyId);
-    return true;
+    bulkWriteInProgressRef.current = true;
+    try {
+      await syncArrayDiff("grocery_items", [], groceryItems, familyId);
+      await syncArrayDiff("meal_ideas", [], mealIdeas, familyId);
+      await syncArrayDiff("week_plan", [], weekPlan, familyId);
+      await syncArrayDiff("members", [], members, familyId);
+      await syncArrayDiff("reward_charts", [], rewardCharts, familyId);
+      await syncArrayDiff("tasks", [], tasks, familyId);
+      return true;
+    } finally {
+      bulkWriteInProgressRef.current = false;
+    }
   };
 
   // Sauvegarde locale : un vrai fichier sur l'appareil, indépendant du serveur —
@@ -736,6 +746,7 @@ function App({ session }) {
     if (!window.confirm("Remplacer toutes les données actuelles par celles de ce fichier de sauvegarde? Cette action ne peut pas être annulée.")) return false;
     if (!familyId) return false;
 
+    bulkWriteInProgressRef.current = true;
     try {
       const text = await file.text();
       const data = JSON.parse(text);
@@ -764,6 +775,8 @@ function App({ session }) {
     } catch {
       window.alert("Ce fichier n'est pas une sauvegarde valide.");
       return false;
+    } finally {
+      bulkWriteInProgressRef.current = false;
     }
   };
 
