@@ -484,7 +484,7 @@ async function startCheckout(plan, setBusy, setError, onNativeSuccess) {
   try {
     if (isNativeApp()) {
       const offerings = await getOfferings();
-      const productId = plan === "annual" ? "ca.planifamille.app.annual" : "ca.planifamille.app.monthly";
+      const productId = plan === "annual" ? "ca.planifamille.app.annual" : "ca.planifamille.app.monthly2";
       const pkg = offerings.find(p => p.product.identifier === productId);
       if (!pkg) throw new Error("Ce forfait n'est pas disponible pour le moment.");
       const customerInfo = await purchasePackage(pkg);
