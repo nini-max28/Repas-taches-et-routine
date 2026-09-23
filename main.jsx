@@ -10,6 +10,15 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => { /* pas grave, l'app fonctionne quand même en ligne */ });
   });
+  // Dès qu'une nouvelle version prend le relais (après un déploiement), on
+  // recharge la page une seule fois pour que tout le monde voie le nouveau
+  // code tout de suite, sans devoir vider manuellement le cache.
+  let alreadyReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (alreadyReloaded) return;
+    alreadyReloaded = true;
+    window.location.reload();
+  });
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
