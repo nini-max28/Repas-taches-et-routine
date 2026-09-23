@@ -255,6 +255,24 @@ const TASK_FREQUENCIES = { unique: "Une fois", quotidien: "Chaque jour", hebdoma
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`);
 
+// L'ancienne app (celle utilisée avant Planifamille) générait des identifiants
+// qui n'ont jamais eu besoin d'être de vrais UUID, puisqu'elle ne parlait pas
+// à une base de données Postgres. Cette base-ci exige le format UUID — cette
+// fonction remplace les identifiants invalides par de nouveaux UUID valides,
+// et retourne la correspondance ancien → nouveau pour corriger les liens
+// (ex. une tâche assignée à un membre) ailleurs dans le fichier importé.
+const isValidUUID = (v) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+function remapInvalidIds(arr) {
+  const map = new Map();
+  const fixed = (arr || []).map(item => {
+    if (isValidUUID(item.id)) return item;
+    const newId = uid();
+    map.set(item.id, newId);
+    return { ...item, id: newId };
+  });
+  return { fixed, map };
+}
+
 function resizeImage(file, maxW = 900, quality = 0.72) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -754,12 +772,29 @@ function App({ session }) {
       const data = JSON.parse(text);
       if (!data || typeof data !== "object") throw new Error("format invalide");
 
-      const gi = data.groceryItems || [];
-      const mi = data.mealIdeas || [];
-      const wp = data.weekPlan || [];
-      const mb = data.members || [];
-      const tk = data.tasks || [];
-      const rc = data.rewardCharts || [];
+      // Corrige les identifiants qui ne sont pas de vrais UUID (venant de
+      // l'ancienne app), et répare les liens qui pointent vers eux.
+      const { fixed: gi } = remapInvalidIds(data.groceryItems);
+      const { fixed: miRaw, map: mealIdMap } = remapInvalidIds(data.mealIdeas);
+      const { fixed: mbRaw, map: memberIdMap } = remapInvalidIds(data.members);
+      const { fixed: rcRaw, map: rewardIdMap } = remapInvalidIds(data.rewardCharts);
+      const { fixed: wpRaw } = remapInvalidIds(data.weekPlan);
+      const { fixed: tkRaw } = remapInvalidIds(data.tasks);
+
+      const remapMember = (id) => (id ? (memberIdMap.get(id) || id) : id);
+      const remapReward = (id) => (id ? (rewardIdMap.get(id) || id) : id);
+      const remapMeal = (id) => (id ? (mealIdMap.get(id) || id) : id);
+
+      const mi = miRaw;
+      const mb = mbRaw;
+      const rc = rcRaw.map(c => ({ ...c, memberId: remapMember(c.memberId) }));
+      const wp = wpRaw.map(p => ({ ...p, mealIdeaId: remapMeal(p.mealIdeaId) }));
+      const tk = tkRaw.map(t => ({
+        ...t,
+        assignedTo: remapMember(t.assignedTo),
+        rotation: Array.isArray(t.rotation) ? t.rotation.map(remapMember) : t.rotation,
+        linkedRewardChartId: remapReward(t.linkedRewardChartId),
+      }));
 
       const importErrors = [];
       const totalFailures =
