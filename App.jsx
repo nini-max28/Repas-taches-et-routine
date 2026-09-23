@@ -214,6 +214,42 @@ const SEED_MEALS = [
   { title: "Pouding au riz", category: "dessert", tags: ["riz", "confort"],  ingredients: [{ name: "riz", quantity: "250 g" }, { name: "lait", quantity: "1,5 L" }, { name: "sucre", quantity: "150 g" }, { name: "cannelle", quantity: "1 c. à thé" }, { name: "vanille", quantity: "1 c. à thé" }], steps: ["Cuire le riz avec le lait à feu doux en remuant souvent, environ 20-25 min.", "Ajouter le sucre et la vanille, poursuivre la cuisson jusqu'à consistance crémeuse.", "Retirer du feu une fois le riz bien tendre et le mélange épaissi.", "Saupoudrer de cannelle.", "Servir chaud ou froid."] },
 ];
 
+// Version anglaise des mêmes 30 recettes suggérées — utilisée uniquement au
+// tout premier chargement d'un nouveau compte, selon la langue de l'appareil
+// à ce moment précis. Une fois créées, ces idées de repas restent modifiables
+// normalement comme n'importe quel autre contenu.
+const SEED_MEALS_EN = [
+  { title: "Pasta with tomato sauce and ground beef", category: "souper", tags: ["quick", "beef"], ingredients: [{ name: "pasta", quantity: "700 g" }, { name: "ground beef", quantity: "700 g" }, { name: "tomato sauce", quantity: "700 ml (2 cans)" }, { name: "onion", quantity: "1 large" }, { name: "garlic", quantity: "3 cloves" }, { name: "parmesan", quantity: "100 g" }], steps: ["Cook the pasta according to package instructions.", "In a pan, sauté the chopped onion and garlic for 2-3 min.", "Add the ground beef, cook while breaking it up until no longer pink.", "Pour in the tomato sauce, let simmer 10 min on low heat.", "Mix with the drained pasta, serve with grated parmesan."] },
+  { title: "Homemade General Tao chicken", category: "souper", tags: ["stovetop", "asian", "chicken", "rice"], ingredients: [{ name: "chicken", quantity: "900 g" }, { name: "broccoli", quantity: "500 g" }, { name: "soy sauce", quantity: "60 ml" }, { name: "garlic", quantity: "3 cloves" }, { name: "ginger", quantity: "2.5 cm" }, { name: "rice", quantity: "600 g (dry)" }], steps: ["Cook the rice according to package instructions.", "Cut the chicken into cubes, brown in an oiled pan.", "Add minced garlic and ginger, cook 1 min.", "Add broccoli florets, cook 3-4 min.", "Pour in the soy sauce (and a little honey or maple syrup if desired), coat well.", "Serve over hot rice."] },
+  { title: "Chili con carne", category: "souper", tags: ["slow cooker", "beef"], ingredients: [{ name: "ground beef", quantity: "700 g" }, { name: "kidney beans", quantity: "2 cans (540 ml)" }, { name: "diced tomatoes", quantity: "2 cans" }, { name: "onion", quantity: "1 large" }, { name: "bell pepper", quantity: "2" }, { name: "chili seasoning", quantity: "3 tbsp" }], steps: ["Sauté the chopped onion and bell pepper in a large pot.", "Add the ground beef, cook until browned.", "Add the diced tomatoes, drained kidney beans, and chili seasoning.", "Simmer on low heat 25-30 min, stirring occasionally.", "Taste and adjust seasoning before serving."] },
+  { title: "Shepherd's pie (pâté chinois)", category: "souper", tags: ["classic", "beef"], ingredients: [{ name: "ground beef", quantity: "700 g" }, { name: "creamed corn", quantity: "2 cans (341 ml)" }, { name: "potato", quantity: "1.5 kg" }, { name: "onion", quantity: "1" }], steps: ["Cook and mash the potatoes.", "Sauté the chopped onion, add the ground beef and cook through; season.", "In a baking dish, layer the beef, then the creamed corn, then the mashed potato.", "Broil a few minutes to brown the top.", "Let rest 5 min before serving."] },
+  { title: "Grilled salmon and roasted vegetables", category: "souper", tags: ["oven", "healthy", "salmon"], ingredients: [{ name: "salmon", quantity: "900 g (6 portions)" }, { name: "broccoli", quantity: "500 g" }, { name: "potato", quantity: "1 kg" }, { name: "lemon", quantity: "2" }, { name: "olive oil", quantity: "3 tbsp" }], steps: ["Preheat the oven to 400°F (200°C).", "Cut the potatoes into pieces, toss with olive oil, salt and pepper; bake 20 min.", "Add the broccoli to the pan, continue cooking 10 min.", "Place the salmon on the pan, drizzle with lemon juice and olive oil.", "Cook another 12-15 min until the salmon flakes easily."] },
+  { title: "Chicken tacos", category: "souper", tags: ["quick", "chicken"], ingredients: [{ name: "chicken", quantity: "800 g" }, { name: "tortillas", quantity: "12" }, { name: "lettuce", quantity: "1/2" }, { name: "tomato", quantity: "3" }, { name: "cheese", quantity: "200 g shredded" }, { name: "salsa", quantity: "250 ml" }], steps: ["Cut the chicken into strips, season (cumin, paprika, salt).", "Cook in a pan 6-8 min until fully cooked.", "Warm the tortillas.", "Fill each tortilla with chicken, lettuce, tomato, shredded cheese and salsa.", "Serve immediately."] },
+  { title: "Minestrone soup", category: "souper", tags: ["veggie", "slow cooker", "soup"], ingredients: [{ name: "mixed vegetables", quantity: "800 g" }, { name: "pasta", quantity: "200 g" }, { name: "diced tomatoes", quantity: "2 cans" }, { name: "vegetable broth", quantity: "2 L" }], steps: ["Sauté the diced vegetables in a bit of oil for 5 min.", "Add the diced tomatoes and vegetable broth.", "Bring to a boil, then simmer 15 min.", "Add the small pasta, cook another 10 min until tender.", "Season and serve with parmesan if desired."] },
+  { title: "Homemade pizza", category: "souper", tags: ["weekend"], ingredients: [{ name: "pizza dough", quantity: "2 large (or 900 g)" }, { name: "tomato sauce", quantity: "500 ml" }, { name: "cheese", quantity: "400 g" }, { name: "toppings of choice", quantity: "to taste" }], steps: ["Preheat the oven to 450°F (230°C).", "Roll out the dough on a floured pan.", "Cover with tomato sauce, then shredded cheese and chosen toppings.", "Bake 12-15 min until the cheese is golden and bubbly.", "Let rest 2-3 min before slicing."] },
+  { title: "Fried rice with vegetables and eggs", category: "souper", tags: ["quick", "veggie", "rice"], ingredients: [{ name: "rice", quantity: "450 g (dry)" }, { name: "egg", quantity: "6" }, { name: "mixed vegetables", quantity: "400 g" }, { name: "soy sauce", quantity: "60 ml" }], steps: ["Use cooled cooked rice (ideally from the day before).", "Stir-fry the vegetables in a wok or large pan for 3-4 min.", "Push to the side, crack the eggs and scramble in the open space.", "Add the rice, mix everything together, drizzle with soy sauce.", "Stir-fry 3-4 min until everything is hot."] },
+  { title: "Beef fajitas", category: "souper", tags: ["stovetop", "beef"], ingredients: [{ name: "beef strips", quantity: "800 g" }, { name: "bell pepper", quantity: "3" }, { name: "onion", quantity: "2" }, { name: "tortillas", quantity: "12" }, { name: "fajita seasoning", quantity: "2 packets" }], steps: ["Season the beef strips with fajita seasoning.", "Cook on high heat in a pan 4-5 min, set aside.", "Sauté the sliced bell pepper and onion 4-5 min.", "Add the beef back, mix and warm through 1 min.", "Serve hot with tortillas and toppings of choice."] },
+  { title: "Homemade mac and cheese", category: "souper", tags: ["comfort"], ingredients: [{ name: "pasta", quantity: "600 g" }, { name: "cheese", quantity: "400 g" }, { name: "milk", quantity: "750 ml" }, { name: "butter", quantity: "60 g" }, { name: "flour", quantity: "60 g" }], steps: ["Cook the pasta according to instructions, drain.", "In a pot, melt the butter, whisk in the flour and cook 1 min.", "Gradually whisk in the milk, cook until thickened.", "Remove from heat, stir in the shredded cheese until melted.", "Mix the sauce with the pasta and serve hot."] },
+  { title: "Wonton soup", category: "souper", tags: ["asian", "soup"], ingredients: [{ name: "wontons", quantity: "24-30" }, { name: "chicken broth", quantity: "2 L" }, { name: "bok choy", quantity: "400 g" }, { name: "ginger", quantity: "2.5 cm" }], steps: ["Bring the chicken broth to a boil with ginger slices.", "Add the wontons (fresh or frozen), cook according to package instructions.", "Add the chopped bok choy, cook 2-3 min until tender.", "Adjust seasoning with a little soy sauce.", "Serve piping hot."] },
+  { title: "Homemade burgers", category: "souper", tags: ["weekend", "beef"], ingredients: [{ name: "ground beef", quantity: "900 g (6 x 150 g)" }, { name: "burger buns", quantity: "6" }, { name: "lettuce", quantity: "to taste" }, { name: "tomato", quantity: "2" }, { name: "cheese", quantity: "6 slices" }], steps: ["Shape the seasoned ground beef into patties.", "Cook in a pan or on the BBQ 4-5 min per side.", "Add a slice of cheese at the end to melt it.", "Lightly toast the buns.", "Assemble with lettuce, tomato and condiments of choice."] },
+  { title: "Maple mustard chicken breasts", category: "souper", tags: ["oven", "chicken"], ingredients: [{ name: "chicken", quantity: "6 breasts (~1.2 kg)" }, { name: "maple syrup", quantity: "125 ml" }, { name: "Dijon mustard", quantity: "60 ml" }, { name: "garlic", quantity: "3 cloves" }], steps: ["Preheat the oven to 375°F (190°C).", "Mix the maple syrup, Dijon mustard and minced garlic.", "Brush the chicken breasts with this mixture in a baking dish.", "Bake 25-30 min until the chicken is fully cooked, basting halfway through.", "Let rest 5 min before serving."] },
+  { title: "Vegetable quiche", category: "souper", tags: ["veggie", "oven"], ingredients: [{ name: "pie crust", quantity: "2" }, { name: "egg", quantity: "8" }, { name: "cream", quantity: "500 ml" }, { name: "vegetables", quantity: "400 g" }, { name: "cheese", quantity: "200 g" }], steps: ["Preheat the oven to 375°F (190°C) and line a pan with the crust.", "Sauté the diced vegetables for a few minutes.", "Whisk the eggs with the cream, salt and pepper.", "Spread the vegetables and shredded cheese in the crust, pour in the egg mixture.", "Bake 35-40 min until set and golden."] },
+  { title: "Asian-style tofu stir-fry", category: "souper", tags: ["veggie", "quick", "rice"], ingredients: [{ name: "tofu", quantity: "700 g" }, { name: "vegetables", quantity: "500 g" }, { name: "soy sauce", quantity: "60 ml" }, { name: "ginger", quantity: "2.5 cm" }, { name: "rice", quantity: "600 g (dry)" }], steps: ["Cook the rice according to package instructions.", "Pat dry and cube the tofu, brown in an oiled pan.", "Set the tofu aside, stir-fry the vegetables with ginger 3-4 min.", "Add the tofu back, add the soy sauce, mix.", "Serve hot over rice."] },
+  { title: "Fish chowder", category: "souper", tags: ["slow cooker", "fish", "soup"], ingredients: [{ name: "fish", quantity: "800 g" }, { name: "potato", quantity: "700 g" }, { name: "creamed corn", quantity: "2 cans" }, { name: "cream", quantity: "500 ml" }, { name: "broth", quantity: "1 L" }], steps: ["Sauté a chopped onion in a pot.", "Add the diced potatoes and broth, cook 15 min until tender.", "Add the creamed corn and cream, mix.", "Add the fish cut into pieces, cook 5-7 min on low heat until cooked through.", "Season and serve hot."] },
+  { title: "Chicken Caesar wraps", category: "souper", tags: ["quick", "chicken"], ingredients: [{ name: "chicken", quantity: "600 g cooked" }, { name: "lettuce", quantity: "1 romaine" }, { name: "parmesan", quantity: "100 g" }, { name: "Caesar dressing", quantity: "250 ml" }, { name: "tortillas", quantity: "6-8" }], steps: ["Cook or use pre-cooked chicken, cut into strips.", "Mix the shredded lettuce with Caesar dressing and parmesan.", "Divide the mixture and chicken in the center of each tortilla.", "Roll tightly, folding in the sides.", "Cut in half and serve."] },
+  { title: "Swedish-style meatballs", category: "souper", tags: ["slow cooker", "comfort", "beef"], ingredients: [{ name: "ground beef", quantity: "900 g" }, { name: "breadcrumbs", quantity: "150 g" }, { name: "egg", quantity: "2" }, { name: "gravy", quantity: "500 ml" }, { name: "potato", quantity: "1.2 kg (mashed)" }], steps: ["Mix the ground beef, breadcrumbs and egg; shape into meatballs.", "Brown the meatballs in a pan on all sides.", "Prepare a brown gravy (or use store-bought), pour over the meatballs.", "Simmer 15-20 min on low heat.", "Serve with mashed potatoes."] },
+  { title: "Vegetable and chickpea curry", category: "souper", tags: ["veggie", "slow cooker", "rice"], ingredients: [{ name: "chickpeas", quantity: "3 cans" }, { name: "coconut milk", quantity: "2 cans (400 ml)" }, { name: "vegetables", quantity: "600 g" }, { name: "curry powder", quantity: "3 tbsp" }, { name: "rice", quantity: "600 g (dry)" }], steps: ["Cook the rice according to package instructions.", "Sauté an onion with the curry powder 1-2 min.", "Add the chopped vegetables, cook 3-4 min.", "Add the drained chickpeas and coconut milk, simmer 15 min.", "Serve hot over rice."] },
+  { title: "Slow cooker chicken and vegetable rice", category: "souper", tags: ["slow cooker", "chicken", "rice"], ingredients: [{ name: "chicken", quantity: "900 g" }, { name: "rice", quantity: "500 g (dry)" }, { name: "broth", quantity: "1 L" }, { name: "carrot", quantity: "4" }, { name: "onion", quantity: "2" }], steps: ["Place the chicken, chopped carrots and onion in the slow cooker.", "Add the broth, cover and cook 4-5 h on low.", "About 30 min before the end, add the rice.", "Continue cooking until the rice is tender.", "Shred the chicken if desired and serve."] },
+  { title: "Chicken noodle soup", category: "souper", tags: ["comfort", "chicken", "soup"], ingredients: [{ name: "chicken", quantity: "500 g cooked" }, { name: "noodles", quantity: "300 g" }, { name: "carrot", quantity: "3" }, { name: "celery", quantity: "3 stalks" }, { name: "chicken broth", quantity: "2.5 L" }], steps: ["Bring the chicken broth to a boil with diced carrot and celery.", "Simmer 10 min until the vegetables are tender.", "Add the shredded cooked chicken and noodles.", "Cook another 5-7 min until the noodles are tender.", "Season and serve hot."] },
+  { title: "Teriyaki salmon and rice", category: "souper", tags: ["quick", "salmon", "rice"], ingredients: [{ name: "salmon", quantity: "900 g" }, { name: "teriyaki sauce", quantity: "180 ml" }, { name: "rice", quantity: "600 g (dry)" }, { name: "broccoli", quantity: "500 g" }], steps: ["Cook the rice according to package instructions.", "Cook the salmon in a pan 3-4 min per side.", "Add the teriyaki sauce near the end, let reduce slightly while coating the fish.", "Steam the broccoli for a few minutes.", "Serve the salmon over rice with the broccoli."] },
+  { title: "Apple crisp", category: "dessert", tags: ["oven"], ingredients: [{ name: "apple", quantity: "8-10" }, { name: "flour", quantity: "200 g" }, { name: "brown sugar", quantity: "250 g" }, { name: "butter", quantity: "150 g" }, { name: "oats", quantity: "150 g" }, { name: "cinnamon", quantity: "2 tsp" }], steps: ["Preheat the oven to 350°F (175°C).", "Peel and slice the apples, mix with a little cinnamon and brown sugar; place in a dish.", "Mix the flour, oats, brown sugar and cold butter until crumbly.", "Spread this mixture over the apples.", "Bake 35-40 min until the top is golden and the apples are tender."] },
+  { title: "Maple syrup pudding (pouding chômeur)", category: "dessert", tags: ["classic"], ingredients: [{ name: "flour", quantity: "300 g" }, { name: "brown sugar", quantity: "400 g" }, { name: "butter", quantity: "120 g" }, { name: "milk", quantity: "250 ml" }, { name: "maple syrup", quantity: "300 ml" }], steps: ["Preheat the oven to 350°F (175°C).", "Prepare a simple batter with flour, butter and milk; pour into a dish.", "Bring the maple syrup and brown sugar to a boil with a little water or cream.", "Pour this hot syrup over the batter without mixing.", "Bake 35-40 min until the top is golden."] },
+  { title: "Chocolate brownies", category: "dessert", tags: ["oven"], ingredients: [{ name: "chocolate", quantity: "200 g" }, { name: "butter", quantity: "150 g" }, { name: "sugar", quantity: "250 g" }, { name: "egg", quantity: "3" }, { name: "flour", quantity: "150 g" }], steps: ["Preheat the oven to 350°F (175°C) and line a square pan.", "Melt the chocolate and butter together.", "Stir in the sugar, then the eggs one at a time, whisking.", "Gently fold in the flour until smooth.", "Bake 25-30 min; let cool before cutting."] },
+  { title: "Sugar pie", category: "dessert", tags: ["classic"], ingredients: [{ name: "brown sugar", quantity: "400 g" }, { name: "cream", quantity: "250 ml" }, { name: "butter", quantity: "100 g" }, { name: "flour", quantity: "30 g" }, { name: "pie crust", quantity: "1" }], steps: ["Preheat the oven to 350°F (175°C) and line a pie plate with the crust.", "Mix the brown sugar, cream and melted butter in a saucepan.", "Heat gently, stirring, until the mixture is smooth.", "Stir in a little flour to thicken slightly, pour into the crust.", "Bake 30-35 min until the center is just set; let cool before serving."] },
+  { title: "Fresh fruit salad", category: "dessert", tags: ["quick", "healthy"], ingredients: [{ name: "fruit", quantity: "1.2 kg" }, { name: "honey", quantity: "60 ml" }, { name: "mint", quantity: "a few leaves" }], steps: ["Wash and cut the seasonal fruit into pieces.", "Gently mix in a large bowl.", "Drizzle with a bit of honey and lemon juice if desired.", "Add a few chopped fresh mint leaves.", "Refrigerate 15-20 min before serving."] },
+  { title: "Rice pudding", category: "dessert", tags: ["rice", "comfort"], ingredients: [{ name: "rice", quantity: "250 g" }, { name: "milk", quantity: "1.5 L" }, { name: "sugar", quantity: "150 g" }, { name: "cinnamon", quantity: "1 tsp" }, { name: "vanilla", quantity: "1 tsp" }], steps: ["Cook the rice with the milk on low heat, stirring often, about 20-25 min.", "Add the sugar and vanilla, continue cooking until creamy.", "Remove from heat once the rice is tender and the mixture has thickened.", "Sprinkle with cinnamon.", "Serve warm or cold."] },
+];
+
 const MEMBER_COLORS = ["#6B9B5E", "#6B8CA8", "#A6634A", "#C98A2B", "#8C6A9B", "#4E8C97"];
 const TASK_FREQUENCIES = { unique: "Une fois", quotidien: "Chaque jour", hebdomadaire: "Chaque semaine", auxDeuxSemaines: "Aux 2 semaines" };
 
@@ -340,18 +376,20 @@ async function upsertSettings(familyId, patch) {
 async function syncArrayDiff(table, prevArr, nextArr, familyId) {
   const prevById = new Map(prevArr.map(x => [x.id, x]));
   const nextIds = new Set(nextArr.map(x => x.id));
+  let failures = 0;
 
   for (const item of prevArr) {
-    if (!nextIds.has(item.id)) await deleteRow(table, item.id);
+    if (!nextIds.has(item.id)) { if (!(await deleteRow(table, item.id))) failures++; }
   }
   for (const item of nextArr) {
     const prevItem = prevById.get(item.id);
     if (!prevItem) {
-      await insertRow(table, familyId, item);
+      if (!(await insertRow(table, familyId, item))) failures++;
     } else if (JSON.stringify(prevItem) !== JSON.stringify(item)) {
-      await updateRow(table, item.id, item);
+      if (!(await updateRow(table, item.id, item))) failures++;
     }
   }
+  return failures;
 }
 
 // ⚠️ TEMPORAIRE : les notifications (SMS, push) ne sont pas encore branchées à
@@ -559,7 +597,7 @@ function AccountMenu({ session, familyInfo }) {
 }
 
 function App({ session }) {
-  const { t: tr } = useLanguage();
+  const { t: tr, lang } = useLanguage();
   const [loaded, setLoaded] = useState(false);
   const [groceryItems, setGroceryItems] = useState([]);
   const [mealIdeas, setMealIdeas] = useState([]);
@@ -612,8 +650,10 @@ function App({ session }) {
     let mi = mi0;
     if (mi.length === 0) {
       // Première ouverture pour cette famille : on amorce avec les idées de
-      // repas suggérées, une seule fois.
-      const seeded = SEED_MEALS.map(m => ({ id: uid(), ...m }));
+      // repas suggérées, une seule fois — dans la langue de l'appareil au
+      // moment de la création du compte.
+      const seedSource = lang === "en" ? SEED_MEALS_EN : SEED_MEALS;
+      const seeded = seedSource.map(m => ({ id: uid(), ...m }));
       for (const meal of seeded) await insertRow("meal_ideas", famId, meal);
       mi = seeded;
     }
@@ -669,8 +709,8 @@ function App({ session }) {
     await syncArrayDiff("meal_ideas", [], mealIdeas, familyId);
     await syncArrayDiff("week_plan", [], weekPlan, familyId);
     await syncArrayDiff("members", [], members, familyId);
-    await syncArrayDiff("tasks", [], tasks, familyId);
     await syncArrayDiff("reward_charts", [], rewardCharts, familyId);
+    await syncArrayDiff("tasks", [], tasks, familyId);
     return true;
   };
 
@@ -708,14 +748,18 @@ function App({ session }) {
       const tk = data.tasks || [];
       const rc = data.rewardCharts || [];
 
-      await syncArrayDiff("grocery_items", groceryItems, gi, familyId);
-      await syncArrayDiff("meal_ideas", mealIdeas, mi, familyId);
-      await syncArrayDiff("week_plan", weekPlan, wp, familyId);
-      await syncArrayDiff("members", members, mb, familyId);
-      await syncArrayDiff("tasks", tasks, tk, familyId);
-      await syncArrayDiff("reward_charts", rewardCharts, rc, familyId);
+      const totalFailures =
+        (await syncArrayDiff("grocery_items", groceryItems, gi, familyId)) +
+        (await syncArrayDiff("meal_ideas", mealIdeas, mi, familyId)) +
+        (await syncArrayDiff("week_plan", weekPlan, wp, familyId)) +
+        (await syncArrayDiff("members", members, mb, familyId)) +
+        (await syncArrayDiff("reward_charts", rewardCharts, rc, familyId)) +
+        (await syncArrayDiff("tasks", tasks, tk, familyId));
 
       setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc);
+      if (totalFailures > 0) {
+        window.alert(`Import terminé, mais ${totalFailures} élément(s) n'ont pas pu être enregistrés sur le serveur — ils pourraient disparaître au prochain rafraîchissement. Réessayez, ou contactez le soutien si ça persiste.`);
+      }
       return true;
     } catch {
       window.alert("Ce fichier n'est pas une sauvegarde valide.");
@@ -2109,37 +2153,37 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
     <div>
       <Card title={tr("settings.syncBackend")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Utilisez la même adresse sur le téléphone de votre conjoint·e pour partager la liste et le plan de repas.
+          {tr("settings.syncBackendHelp")}
         </p>
-        <label style={labelStyle}>Adresse du backend</label>
+        <label style={labelStyle}>{tr("settings.backendAddress")}</label>
         <input style={inputStyle} value={form.backendUrl} onChange={e => setForm({ ...form, backendUrl: e.target.value })} placeholder="https://epicerie-repas-backend.onrender.com" />
-        <button type="button" onClick={testBackend} style={outlineBtn}>Tester la connexion</button>
+        <button type="button" onClick={testBackend} style={outlineBtn}>{tr("settings.testConnection")}</button>
         {testResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{testResult}</p>}
       </Card>
 
       <Card title={tr("settings.smsNumbers")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Format international, ex. +15145551234. Le bouton "Envoyer par SMS" de l'onglet Épicerie texte la liste (articles non cochés) à tous les numéros remplis ci-dessous.
+          {tr("settings.smsHelp")}
         </p>
-        <label style={labelStyle}>Numéro 1</label>
+        <label style={labelStyle}>{tr("settings.number")} 1</label>
         <input style={inputStyle} value={form.phone1 || ""} onChange={e => setForm({ ...form, phone1: e.target.value })} placeholder="+15145551234" />
-        <label style={labelStyle}>Numéro 2</label>
+        <label style={labelStyle}>{tr("settings.number")} 2</label>
         <input style={inputStyle} value={form.phone2 || ""} onChange={e => setForm({ ...form, phone2: e.target.value })} placeholder="+15145551234" />
-        <label style={labelStyle}>Numéro 3</label>
+        <label style={labelStyle}>{tr("settings.number")} 3</label>
         <input style={inputStyle} value={form.phone3 || ""} onChange={e => setForm({ ...form, phone3: e.target.value })} placeholder="+15145551234" />
-        <label style={labelStyle}>Numéro 4</label>
+        <label style={labelStyle}>{tr("settings.number")} 4</label>
         <input style={inputStyle} value={form.phone4 || ""} onChange={e => setForm({ ...form, phone4: e.target.value })} placeholder="+15145551234" />
       </Card>
 
       <Card title={tr("settings.taskAlertChannel")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Comment vos enfants reçoivent-elles les alertes de tour de tâche et les relances?
+          {tr("settings.alertChannelHelp")}
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            ["both", "SMS et notification"],
-            ["push", "Notification seulement"],
-            ["sms", "SMS seulement"],
+            ["both", tr("settings.channelBoth")],
+            ["push", tr("settings.channelPush")],
+            ["sms", tr("settings.channelSms")],
           ].map(([key, label]) => (
             <label key={key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: (form.taskNotifyChannel || "both") === key ? "#F0EAD8" : "#fff", border: `1.5px solid ${(form.taskNotifyChannel || "both") === key ? COLORS.accentDark : "#D8D2BE"}`, borderRadius: 8, cursor: "pointer" }}>
               <input type="radio" name="taskNotifyChannel" checked={(form.taskNotifyChannel || "both") === key} onChange={() => setForm({ ...form, taskNotifyChannel: key })} />
@@ -2151,26 +2195,26 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
       <Card title={tr("settings.deviceNotifications")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Chaque enfant doit se choisir elle-même dans la liste ci-dessous, sur son <strong>propre téléphone</strong> — ça sert à la fois pour les notifications et pour que l'onglet Tâches ne lui montre que ses propres tâches par défaut. Ce choix est propre à cet appareil et ne touche jamais aux autres.
+          {tr("settings.deviceNotifHelp")}
         </p>
         {members.length === 0 ? (
-          <p style={{ fontSize: 12.5, color: COLORS.muted }}>Ajoutez d'abord des membres dans l'onglet Tâches.</p>
+          <p style={{ fontSize: 12.5, color: COLORS.muted }}>{tr("settings.addMembersFirst3")}</p>
         ) : (
           <>
-            <label style={labelStyle}>Sur ce téléphone, je suis :</label>
+            <label style={labelStyle}>{tr("settings.onThisPhone")}</label>
             <select style={inputStyle} value={myMemberId} onChange={e => setMyMemberId(e.target.value)}>
-              <option value="">— Personne en particulier (voir toutes les tâches) —</option>
+              <option value="">{tr("settings.noOneSpecific")}</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" onClick={enablePushForMember} style={outlineBtn} disabled={pushBusy}>
-                <Bell size={14} /> {pushBusy ? "Activation…" : "Activer les notifications"}
+                <Bell size={14} /> {pushBusy ? tr("settings.activating") : tr("settings.activateNotifications")}
               </button>
-              <button type="button" onClick={testPushForMember} style={outlineBtn}>Envoyer un test</button>
+              <button type="button" onClick={testPushForMember} style={outlineBtn}>{tr("settings.sendTest")}</button>
             </div>
             {pushStatus && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{pushStatus}</p>}
             <p style={{ fontSize: 11.5, color: COLORS.muted, marginTop: 8, marginBottom: 0 }}>
-              Ce choix s'enregistre tout de suite, pas besoin du bouton "Enregistrer les paramètres" plus bas. Sur iPhone, l'app doit d'abord être ajoutée à l'écran d'accueil pour que les notifications fonctionnent.
+              {tr("settings.deviceNotifFootnote")}
             </p>
           </>
         )}
@@ -2178,31 +2222,31 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
       <Card title={tr("settings.parentDevice")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Si ce téléphone est le vôtre (pas celui d'un enfant) et que vous avez testé les notifications par erreur, touchez ce bouton pour être certain de ne plus jamais recevoir d'alertes de tâches destinées aux enfants — ça désabonne complètement cet appareil.
+          {tr("settings.parentDeviceHelp")}
         </p>
         <button type="button" onClick={markAsParentDevice} style={outlineBtn} disabled={pushBusy}>
-          {pushBusy ? "En cours…" : "Ceci est l'appareil d'un parent — retirer les alertes d'enfants"}
+          {pushBusy ? tr("settings.inProgress") : tr("settings.parentDeviceBtn")}
         </button>
       </Card>
 
       <Card title={tr("settings.classHours")}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
           <input type="checkbox" checked={form.schoolHoursEnabled !== false} onChange={e => setForm({ ...form, schoolHoursEnabled: e.target.checked })} />
-          <span style={{ fontSize: 13.5, fontWeight: 600 }}>Ne pas envoyer d'alerte de tâche pendant les heures de classe</span>
+          <span style={{ fontSize: 13.5, fontWeight: 600 }}>{tr("settings.noAlertDuringClass")}</span>
         </label>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Du lundi au vendredi seulement. Les alertes de tour de tâche sont mises en attente et partent automatiquement dès la sortie des classes. La liste d'épicerie n'est pas concernée.
+          {tr("settings.classHoursHelp")}
         </p>
         {form.schoolHoursEnabled !== false && (
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Début des classes</label>
+              <label style={labelStyle}>{tr("settings.classStart")}</label>
               <select style={inputStyle} value={form.schoolStartHour ?? 8} onChange={e => setForm({ ...form, schoolStartHour: Number(e.target.value) })}>
                 {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Fin des classes</label>
+              <label style={labelStyle}>{tr("settings.classEnd")}</label>
               <select style={inputStyle} value={form.schoolEndHour ?? 15} onChange={e => setForm({ ...form, schoolEndHour: Number(e.target.value) })}>
                 {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
               </select>
@@ -2213,45 +2257,45 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
       <Card title={tr("settings.reminderSchedule")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Pour une tâche (ou un tour) toujours pas faite. En semaine : trois moments fixes. La fin de semaine, sans heures de classe : plusieurs rappels espacés dans la journée.
+          {tr("settings.reminderHelp")}
         </p>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>Semaine</div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{tr("settings.week")}</div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 90 }}>
-            <label style={labelStyle}>Avant l'école</label>
+            <label style={labelStyle}>{tr("settings.beforeSchool")}</label>
             <select style={inputStyle} value={form.morningReminderHour ?? 7} onChange={e => setForm({ ...form, morningReminderHour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 90 }}>
-            <label style={labelStyle}>Après l'école</label>
+            <label style={labelStyle}>{tr("settings.afterSchool")}</label>
             <select style={inputStyle} value={form.afternoonReminderHour ?? 16} onChange={e => setForm({ ...form, afternoonReminderHour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
             </select>
           </div>
           <div style={{ flex: 1, minWidth: 90 }}>
-            <label style={labelStyle}>Soir</label>
+            <label style={labelStyle}>{tr("settings.evening")}</label>
             <select style={inputStyle} value={form.eveningReminderHour ?? 19} onChange={e => setForm({ ...form, eveningReminderHour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
             </select>
           </div>
         </div>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>Fin de semaine</div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink, marginBottom: 6 }}>{tr("settings.weekend")}</div>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>À partir de</label>
+            <label style={labelStyle}>{tr("settings.from")}</label>
             <select style={inputStyle} value={form.weekendReminderStartHour ?? 8} onChange={e => setForm({ ...form, weekendReminderStartHour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Jusqu'à</label>
+            <label style={labelStyle}>{tr("settings.until")}</label>
             <select style={inputStyle} value={form.weekendReminderEndHour ?? 20} onChange={e => setForm({ ...form, weekendReminderEndHour: Number(e.target.value) })}>
               {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h00</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Toutes les</label>
+            <label style={labelStyle}>{tr("settings.every")}</label>
             <select style={inputStyle} value={form.weekendReminderIntervalHours ?? 2} onChange={e => setForm({ ...form, weekendReminderIntervalHours: Number(e.target.value) })}>
               {[1, 2, 3, 4].map(h => <option key={h} value={h}>{h}h</option>)}
             </select>
@@ -2260,24 +2304,24 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
       </Card>
 
       <button type="button" onClick={() => onSave({ ...form, backendUrl: cleanBackendUrl(form.backendUrl) })} style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px", marginBottom: 16 }}>
-        <Check size={16} /> Enregistrer les paramètres
+        <Check size={16} /> {tr("settings.saveSettings")}
       </button>
       <Card title={tr("settings.deviceSync")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
-          Cet appareil a <strong>{itemsCount}</strong> article(s) d'épicerie et <strong>{mealsCount}</strong> idée(s) de repas en mémoire locale.
+          {tr("settings.deviceHasItemsPrefix")} <strong>{itemsCount}</strong> {tr("settings.deviceHasItemsGrocery")} <strong>{mealsCount}</strong> {tr("settings.deviceHasItemsMeals")}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button type="button" onClick={forceSync} style={outlineBtn} disabled={syncing}>
-            <RefreshCw size={14} /> {syncing ? "Synchronisation…" : "Recevoir du serveur"}
+            <RefreshCw size={14} /> {syncing ? tr("settings.syncing") : tr("settings.receiveFromServer")}
           </button>
           <button type="button" onClick={async () => { setPushing(true); const ok = await onForcePush(); setPushResult(ok ? "✅ Vos données ont été renvoyées au serveur." : "❌ Échec de l'envoi."); setPushing(false); }} style={outlineBtn} disabled={pushing}>
-            <RefreshCw size={14} /> {pushing ? "Envoi…" : "Renvoyer mes données au serveur"}
+            <RefreshCw size={14} /> {pushing ? tr("settings.sendingData") : tr("settings.resendData")}
           </button>
         </div>
         {syncResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{syncResult}</p>}
         {pushResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{pushResult}</p>}
         <p style={{ fontSize: 11.5, color: COLORS.muted, marginTop: 8, marginBottom: 0 }}>
-          "Recevoir du serveur" ramène ce qui est déjà en ligne sur cet appareil. "Renvoyer mes données" fait l'inverse — utile si le serveur a perdu ses données (ex. après une pause d'inactivité) et que cet appareil a encore les bonnes informations.
+          {tr("settings.deviceSyncFootnote")}
         </p>
       </Card>
 
@@ -2325,26 +2369,26 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
       <Card title={tr("settings.localBackup")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          Un fichier de sauvegarde téléchargé sur cet appareil, indépendant du serveur — un filet de sécurité supplémentaire. Faites-en une de temps en temps, surtout après avoir bâti une routine ou un défi récompense.
+          {tr("settings.backupHelp")}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" onClick={onExport} style={outlineBtn}><FileText size={14} /> Exporter une sauvegarde</button>
+          <button type="button" onClick={onExport} style={outlineBtn}><FileText size={14} /> {tr("settings.exportBackup")}</button>
           <label style={{ ...outlineBtn, cursor: "pointer", display: "inline-flex" }}>
-            <FileText size={14} /> Importer une sauvegarde
+            <FileText size={14} /> {tr("settings.importBackup")}
             <input type="file" accept="application/json" style={{ display: "none" }}
               onChange={async (e) => { const file = e.target.files?.[0]; if (file) await onImport(file); e.target.value = ""; }} />
           </label>
         </div>
         <p style={{ fontSize: 11.5, color: COLORS.muted, marginTop: 8, marginBottom: 0 }}>
-          Importer remplace toutes les données actuelles (cet appareil et le serveur) par celles du fichier — une confirmation est demandée avant.
+          {tr("settings.importFootnote")}
         </p>
       </Card>
 
       <Card title={tr("settings.taskReminders")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
-          Un texto est envoyé automatiquement chaque jour (18h par défaut) à qui a une tâche en retard, jusqu'à 3 fois par tour.
+          {tr("settings.taskReminderHelp")}
         </p>
-        <button type="button" onClick={runRemindersNow} style={outlineBtn}>Vérifier les relances maintenant</button>
+        <button type="button" onClick={runRemindersNow} style={outlineBtn}>{tr("settings.checkRemindersNow")}</button>
         {reminderResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{reminderResult}</p>}
       </Card>
     </div>
