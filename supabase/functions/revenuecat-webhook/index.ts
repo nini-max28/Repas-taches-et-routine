@@ -23,11 +23,12 @@ function planFromProductId(productId: string): string {
 }
 
 Deno.serve(async (req) => {
-  // RevenueCat envoie le secret partagé dans l'en-tête Authorization, au
-  // format "Bearer <secret>" — configuré dans le tableau de bord RevenueCat
-  // sous Project Settings > Webhooks.
-  const authHeader = req.headers.get("Authorization") || "";
-  if (authHeader !== `Bearer ${REVENUECAT_WEBHOOK_SECRET}`) {
+  // RevenueCat envoie exactement ce qui a été tapé dans le champ "Authorization
+  // header" de son tableau de bord — pas de préfixe "Bearer" ajouté
+  // automatiquement comme le fait Stripe. On accepte les deux formats, pour ne
+  // pas dépendre de la façon exacte dont le champ a été rempli.
+  const authHeader = (req.headers.get("Authorization") || "").trim();
+  if (authHeader !== REVENUECAT_WEBHOOK_SECRET && authHeader !== `Bearer ${REVENUECAT_WEBHOOK_SECRET}`) {
     return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 });
   }
 
