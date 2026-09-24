@@ -12,16 +12,28 @@ const REVENUECAT_API_KEY_ANDROID = "VOTRE_CLÉ_PUBLIQUE_ANDROID_ICI";
 
 export const isNativeApp = () => Capacitor.isNativePlatform();
 
-let initialized = false;
+let configured = false;
 
-// À appeler une fois, dès qu'on connaît l'id de l'utilisateur Supabase — cet
-// id devient aussi l'identifiant RevenueCat, ce qui permet à la fonction
-// serveur "revenuecat-webhook" de savoir à quelle famille associer un achat.
+// À appeler dès qu'on connaît l'id de l'utilisateur Supabase — cet id devient
+// aussi l'identifiant RevenueCat, ce qui permet à la fonction serveur
+// "revenuecat-webhook" de savoir à quelle famille associer un achat. Appelée
+// à nouveau à chaque connexion (pas juste la toute première fois), pour que
+// RevenueCat reste toujours aligné sur la bonne personne — sinon un achat
+// pourrait rester associé à un ancien identifiant si l'app avait déjà été
+// initialisée une première fois avant que la session soit bien établie.
 export async function initRevenueCat(userId) {
-  if (!isNativeApp() || initialized) return;
+  if (!isNativeApp() || !userId) return;
   const apiKey = Capacitor.getPlatform() === "ios" ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
-  await Purchases.configure({ apiKey, appUserID: userId });
-  initialized = true;
+  if (!configured) {
+    await Purchases.configure({ apiKey, appUserID: userId });
+    configured = true;
+  } else {
+    // Déjà configuré (probablement avec un identifiant temporaire/anonyme,
+    // ou celui d'une session précédente) — on s'assure que c'est bien CETTE
+    // personne qui est identifiée avant tout achat.
+    const current = await Purchases.getAppUserID();
+    if (current?.appUserID !== userId) await Purchases.logIn({ appUserID: userId });
+  }
 }
 
 // Retourne les forfaits disponibles (mensuel, annuel) tels que configurés
