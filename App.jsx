@@ -575,15 +575,40 @@ function Paywall({ familyInfo }) {
 
 // Fenêtre de compte — utilise le même "bottom sheet" fiable que les autres
 // fenêtres de l'app (plus robuste sur mobile qu'un petit menu déroulant).
-function AccountMenu({ session, familyInfo }) {
+function AccountMenu({ session, familyInfo, onRenameFamily, onDeleteAccount }) {
   const { t: tr, lang } = useLanguage();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [familyName, setFamilyName] = useState(familyInfo?.name || "");
+  const [nameSaved, setNameSaved] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  useEffect(() => { setFamilyName(familyInfo?.name || ""); }, [familyInfo?.name]);
 
   const isActive = familyInfo?.subscriptionStatus === "active";
   const isPastDue = familyInfo?.subscriptionStatus === "past_due";
   const trialEndsAt = familyInfo?.trialEndsAt;
+
+  const saveFamilyName = async () => {
+    setNameSaved(false);
+    const ok = await onRenameFamily(familyName);
+    if (ok) { setNameSaved(true); setTimeout(() => setNameSaved(false), 2000); }
+  };
+
+  const confirmDelete = async () => {
+    setDeleteBusy(true); setDeleteError("");
+    try {
+      await onDeleteAccount();
+      // Une fois déconnectée par onDeleteAccount, l'app retourne à l'accueil
+      // toute seule — rien d'autre à faire ici.
+    } catch (err) {
+      setDeleteError(tr("account.deleteError"));
+      setDeleteBusy(false);
+    }
+  };
 
   return (
     <>
@@ -593,6 +618,12 @@ function AccountMenu({ session, familyInfo }) {
       {open && (
         <ModalShell title={tr("account.title")} onClose={() => setOpen(false)}>
           <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 16px", wordBreak: "break-all" }}>{session?.user?.email}</p>
+
+          <label style={labelStyle}>{tr("account.familyName")}</label>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={familyName} onChange={e => setFamilyName(e.target.value)} placeholder={tr("account.familyNamePlaceholder")} />
+            <button type="button" onClick={saveFamilyName} style={{ ...outlineBtn, whiteSpace: "nowrap" }}>{nameSaved ? "✓" : tr("action.save")}</button>
+          </div>
 
           <div style={{ background: "#F0EAD8", borderRadius: 10, padding: 14, marginBottom: 16 }}>
             <p style={{ fontSize: 12.5, color: COLORS.muted, margin: "0 0 10px" }}>
@@ -607,9 +638,28 @@ function AccountMenu({ session, familyInfo }) {
             </button>
           </div>
 
-          <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "none", border: `1.5px solid ${COLORS.danger}`, borderRadius: 8, padding: "10px 16px", color: COLORS.danger, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          <button type="button" onClick={() => supabase.auth.signOut()} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", background: "none", border: `1.5px solid ${COLORS.danger}`, borderRadius: 8, padding: "10px 16px", color: COLORS.danger, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14 }}>
             <LogOut size={15} /> {tr("action.logout")}
           </button>
+
+          {!confirmingDelete ? (
+            <button type="button" onClick={() => setConfirmingDelete(true)} style={{ background: "none", border: "none", color: COLORS.muted, fontSize: 12, textDecoration: "underline", cursor: "pointer", width: "100%", textAlign: "center" }}>
+              {tr("account.delete")}
+            </button>
+          ) : (
+            <div style={{ border: `1.5px solid ${COLORS.danger}`, borderRadius: 10, padding: 14 }}>
+              <p style={{ fontSize: 13.5, fontWeight: 700, color: COLORS.ink, margin: "0 0 8px" }}>{tr("account.deleteTitle")}</p>
+              <p style={{ fontSize: 12, color: COLORS.muted, margin: "0 0 8px" }}>{tr("account.deleteWarning")}</p>
+              <p style={{ fontSize: 11.5, color: COLORS.muted, margin: "0 0 12px", fontStyle: "italic" }}>{tr("account.deleteAppleNote")}</p>
+              {deleteError && <p style={{ color: COLORS.danger, fontSize: 12, marginBottom: 10 }}>{deleteError}</p>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => setConfirmingDelete(false)} style={{ ...outlineBtn, flex: 1 }}>{tr("action.cancel")}</button>
+                <button type="button" disabled={deleteBusy} onClick={confirmDelete} style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "none", background: COLORS.danger, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  {deleteBusy ? tr("account.deleting") : tr("account.deleteConfirm")}
+                </button>
+              </div>
+            </div>
+          )}
         </ModalShell>
       )}
     </>
@@ -728,6 +778,24 @@ function App({ session }) {
 
   // Renvoie tout ce que cet appareil a en mémoire locale vers Supabase — utile
   // si un import de sauvegarde a laissé les choses dans un état incohérent.
+  // Change le nom affiché de la famille (ex. "Famille Doucet" au lieu de "Ma
+  // famille" par défaut).
+  const renameFamily = async (newName) => {
+    if (!familyId || !newName.trim()) return false;
+    const ok = await updateRow("families", familyId, { name: newName.trim() });
+    if (ok) setFamilyInfo(f => ({ ...f, name: newName.trim() }));
+    return ok;
+  };
+
+  // Supprime définitivement le compte et toutes les données de la famille —
+  // exigé par Apple pour toute app permettant de créer un compte.
+  const deleteAccount = async () => {
+    const { data, error } = await supabase.functions.invoke("delete-account", { body: {} });
+    if (error || !data?.success) throw new Error(data?.error || "La suppression a échoué.");
+    await supabase.auth.signOut();
+    return true;
+  };
+
   const forcePushAll = async () => {
     if (!familyId) return false;
     bulkWriteInProgressRef.current = true;
@@ -1089,7 +1157,7 @@ function App({ session }) {
               Planifamille
             </h1>
           </div>
-          {!isKidLocked && <AccountMenu session={session} familyInfo={familyInfo} />}
+          {!isKidLocked && <AccountMenu session={session} familyInfo={familyInfo} onRenameFamily={renameFamily} onDeleteAccount={deleteAccount} />}
         </div>
       </header>
 
