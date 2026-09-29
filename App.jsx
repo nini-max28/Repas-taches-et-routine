@@ -993,6 +993,16 @@ function App({ session }) {
         history: nextHistory, progress: 0, goal: chart.goal + (chart.increment || 2),
         milestonesReached: (chart.milestonesReached || 0) + 1, awaitingReward: true,
       });
+      // Le défi est atteint — on avertit les parents (par SMS/notification,
+      // selon leurs numéros dans Réglages) que c'est le moment de donner la
+      // récompense, plutôt que de compter sur eux pour le remarquer seuls.
+      if (familyId) {
+        const child = members.find(m => m.id === chart.memberId);
+        const childName = child?.name || "Un enfant";
+        supabase.functions.invoke("notify", {
+          body: { action: "broadcast", familyId, body: `🌟 ${childName} a atteint son défi récompense — c'est le moment de sa récompense!` },
+        }).catch(() => { /* silencieux — l'étoile est quand même enregistrée */ });
+      }
     } else {
       updateRewardChart(chart.id, { history: nextHistory, progress: nextProgress });
     }
