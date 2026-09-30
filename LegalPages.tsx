@@ -35,7 +35,10 @@ export function PrivacyPolicyPage() {
       <p style={p}>
         Renseignements de compte (courriel, mot de passe chiffré) ; renseignements familiaux que vous choisissez d'ajouter (prénoms des membres de la famille, y compris les enfants, couleurs et avatars) ;
         numéros de téléphone pour les alertes SMS que vous activez ; le contenu que vous créez (listes d'épicerie, idées de repas, tâches, routines, défis récompense) ;
-        renseignements de paiement, traités entièrement par Stripe — nous ne voyons ni ne stockons jamais votre numéro de carte ; données techniques (adresse IP, type d'appareil, journaux d'erreurs).
+        renseignements de paiement, traités entièrement par Stripe, Apple ou Google — nous ne voyons ni ne stockons jamais votre numéro de carte ; données techniques (adresse IP, type d'appareil, journaux d'erreurs).
+      </p>
+      <p style={p}>
+        <strong>Renseignements de santé (fonctionnalité optionnelle) :</strong> si vous choisissez d'utiliser le carnet de santé, vous pouvez y saisir des renseignements sur la santé des membres de votre famille — vaccins, allergies, rendez-vous médicaux, mesures de poids et taille, médicaments, et des documents que vous téléversez vous-même (photos ou copies de prescriptions ou de requêtes médicales). Ces renseignements sont d'une nature particulièrement sensible. Ils ne sont jamais utilisés à d'autres fins que de vous permettre de les consulter, ne sont jamais partagés avec un tiers autre que notre hébergeur de base de données (Supabase, nécessaire pour stocker l'information), et ne servent jamais à des fins publicitaires, d'analyse ou de profilage. L'utilisation de cette fonctionnalité est entièrement facultative.
       </p>
       <p style={p}>
         Notre service est conçu pour être utilisé par des parents qui créent des profils pour leurs enfants. Les enfants ne créent pas de compte et ne fournissent aucun renseignement directement — c'est le parent titulaire du compte qui saisit et contrôle ces informations en tout temps.
@@ -45,7 +48,7 @@ export function PrivacyPolicyPage() {
       <p style={p}>Uniquement pour faire fonctionner l'application, traiter vos paiements d'abonnement, vous contacter au sujet de votre compte, améliorer le service et respecter nos obligations légales. Nous ne vendons jamais vos renseignements personnels, ni ceux de vos enfants, à des tiers à des fins publicitaires ou commerciales.</p>
 
       <h2 style={h2}>Avec qui nous partageons des renseignements</h2>
-      <p style={p}>Nous faisons appel à des fournisseurs externes, chacun n'ayant accès qu'aux renseignements nécessaires à sa tâche : Supabase (hébergement de la base de données), Twilio (envoi des messages texte), Stripe (traitement des paiements), Render (hébergement du site web). Certains de ces fournisseurs peuvent stocker des données à l'extérieur du Québec.</p>
+      <p style={p}>Nous faisons appel à des fournisseurs externes, chacun n'ayant accès qu'aux renseignements nécessaires à sa tâche : Supabase (hébergement de la base de données), Twilio (envoi des messages texte), Stripe, Apple et Google (traitement des paiements et abonnements, via RevenueCat), Resend (envoi des courriels transactionnels), Render (hébergement du site web). Certains de ces fournisseurs peuvent stocker des données à l'extérieur du Québec.</p>
 
       <h2 style={h2}>Combien de temps nous conservons vos renseignements</h2>
       <p style={p}>Vos données sont conservées tant que votre compte est actif. Si vous annulez votre abonnement, vos données restent disponibles pendant 60 jours, puis sont supprimées définitivement, sauf obligation légale de conservation plus longue. Vous pouvez demander la suppression immédiate de votre compte en tout temps.</p>
