@@ -72,6 +72,31 @@ Deno.serve(async () => {
       notified++;
     }
 
+    // --- Médicaments : une alerte au moment précis de chaque prise prévue,
+    // envoyée aux parents (par SMS/notification), jamais deux fois pour la
+    // même prise grâce au journal health_medication_log. ---
+    const { data: meds } = await admin.from("health_medications").select("*")
+      .eq("family_id", family.id).eq("active", true)
+      .lte("start_date", dateStr);
+    for (const med of meds || []) {
+      if (med.end_date && med.end_date < dateStr) continue;
+      const times: string[] = med.times || [];
+      if (!times.includes(currentTime)) continue;
+
+      const { error: logError } = await admin.from("health_medication_log")
+        .insert({ medication_id: med.id, dose_date: dateStr, dose_time: currentTime });
+      if (logError) continue; // déjà envoyée pour cette prise (contrainte unique) — on n'avertit pas deux fois
+
+      const { data: member } = await admin.from("members").select("*").eq("id", med.member_id).maybeSingle();
+      const childName = member?.name || "un enfant";
+      await callNotify({
+        action: "broadcast",
+        familyId: family.id,
+        body: `💊 C'est l'heure du médicament de ${childName} : ${med.name}${med.dosage ? ` (${med.dosage})` : ""}.`,
+      });
+      notified++;
+    }
+
     // --- Tâches simples et en alternance : créneaux matin/après-midi/soir ---
     const { data: settingsRow } = await admin.from("settings").select("*").eq("family_id", family.id).maybeSingle();
     const morningHour = settingsRow?.morning_reminder_hour ?? 7;
