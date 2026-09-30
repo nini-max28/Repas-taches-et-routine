@@ -674,7 +674,7 @@ function AccountMenu({ session, familyInfo, onRenameFamily, onDeleteAccount }) {
 }
 
 function App({ session }) {
-  const { t: tr, lang } = useLanguage();
+  const { t: tr, lang, setLang } = useLanguage();
   const [loaded, setLoaded] = useState(false);
   const [groceryItems, setGroceryItems] = useState([]);
   const [mealIdeas, setMealIdeas] = useState([]);
@@ -1261,7 +1261,23 @@ function App({ session }) {
               Planifamille
             </h1>
           </div>
-          {!isKidLocked && <AccountMenu session={session} familyInfo={familyInfo} onRenameFamily={renameFamily} onDeleteAccount={deleteAccount} />}
+          {!isKidLocked && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setLang(lang === "fr" ? "en" : "fr")}
+                aria-label="Langue / Language"
+                style={{
+                  background: "#F0EAD8", border: "1px solid #D8D2BE", borderRadius: 20,
+                  padding: "4px 10px", fontSize: 11.5, fontWeight: 700, color: COLORS.accentDark,
+                  cursor: "pointer", fontFamily: "'IBM Plex Sans', sans-serif",
+                }}
+              >
+                {lang === "fr" ? "FR" : "EN"}
+              </button>
+              <AccountMenu session={session} familyInfo={familyInfo} onRenameFamily={renameFamily} onDeleteAccount={deleteAccount} />
+            </div>
+          )}
         </div>
       </header>
 
@@ -3106,13 +3122,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         <p style={{ fontSize: 11.5, color: COLORS.muted, marginTop: 8, marginBottom: 0 }}>
           {tr("settings.deviceSyncFootnote")}
         </p>
-      </Card>
-
-      <Card title={tr("settings.language")}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={() => setLang("fr")} style={lang === "fr" ? primaryBtn : outlineBtn}>{tr("settings.languageFrench")}</button>
-          <button type="button" onClick={() => setLang("en")} style={lang === "en" ? primaryBtn : outlineBtn}>{tr("settings.languageEnglish")}</button>
-        </div>
       </Card>
 
       <Card title={tr("settings.subscription")}>
