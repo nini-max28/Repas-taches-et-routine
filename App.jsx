@@ -9,7 +9,8 @@ import { useLanguage } from "./i18n.jsx";
 import {
   ShoppingCart, ChefHat, CalendarDays, Settings, Plus, X, Check, Trash2, Pencil,
   RefreshCw, AlertCircle, Dice5, ChevronLeft, ChevronRight, Sparkles, ListTodo, UserPlus, Send, Bell,
-  Camera, FileText, UserCircle, LogOut
+  Camera, FileText, UserCircle, LogOut, HeartPulse, Wallet, Syringe, AlertTriangle, Stethoscope, Ruler,
+  TrendingUp, TrendingDown, Pill
 } from "lucide-react";
 
 const LS_PREFIX = "epicerieRepas:";
@@ -567,6 +568,12 @@ function Paywall({ familyInfo }) {
             Restaurer mes achats
           </button>
         )}
+        <button
+          onClick={() => supabase.auth.signOut()}
+          style={{ background: "none", border: "none", color: "#7A7256", fontSize: 12, textDecoration: "underline", cursor: "pointer", marginTop: 14, display: "block", width: "100%" }}
+        >
+          Se déconnecter
+        </button>
       </div>
     </div>
   );
@@ -673,6 +680,13 @@ function App({ session }) {
   const [mealIdeas, setMealIdeas] = useState([]);
   const [weekPlan, setWeekPlan] = useState([]);
   const [members, setMembers] = useState([]);
+  const [vaccines, setVaccines] = useState([]);
+  const [allergies, setAllergies] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [measurements, setMeasurements] = useState([]);
+  const [budgetTx, setBudgetTx] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [medications, setMedications] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [rewardCharts, setRewardCharts] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -710,13 +724,20 @@ function App({ session }) {
     setFamilyId(famId);
     if (!famId) { setLoaded(true); return; }
 
-    const [gi, mi0, wp, mb, tk, rc, settingsRes, familyRes] = await Promise.all([
+    const [gi, mi0, wp, mb, tk, rc, vacc, alg, apt, meas, budg, docs, meds, settingsRes, familyRes] = await Promise.all([
       loadTable("grocery_items"),
       loadTable("meal_ideas"),
       loadTable("week_plan"),
       loadTable("members"),
       loadTable("tasks"),
       loadTable("reward_charts"),
+      loadTable("health_vaccines"),
+      loadTable("health_allergies"),
+      loadTable("health_appointments"),
+      loadTable("health_measurements"),
+      loadTable("budget_transactions"),
+      loadTable("health_documents"),
+      loadTable("health_medications"),
       supabase.from("settings").select("*").eq("family_id", famId).maybeSingle(),
       supabase.from("families").select("*").eq("id", famId).single(),
     ]);
@@ -738,6 +759,8 @@ function App({ session }) {
     const s = { ...DEFAULT_SETTINGS, ...cleanSettings };
 
     setGroceryItems(gi); setMealIdeas(mi); setWeekPlan(wp); setMembers(mb); setTasks(tk); setRewardCharts(rc); setSettings(s);
+    setVaccines(vacc); setAllergies(alg); setAppointments(apt); setMeasurements(meas); setBudgetTx(budg);
+    setDocuments(docs); setMedications(meds);
     lsSet("settings", s);
     setLoaded(true);
   }, []);
@@ -795,6 +818,77 @@ function App({ session }) {
     await supabase.auth.signOut();
     return true;
   };
+
+  // Carnet de santé — ajouter, modifier, retirer une entrée. Pas de système
+  // de "diff" complexe comme pour les tâches, puisque ce ne sont jamais des
+  // cases à cocher, juste un historique qui s'allonge ou se corrige.
+  const addVaccine = async (v) => {
+    const row = await insertRow("health_vaccines", familyId, { ...v, id: uid() });
+    if (row) setVaccines(prev => [...prev, row]);
+  };
+  const updateVaccine = async (id, patch) => {
+    if (await updateRow("health_vaccines", id, patch)) setVaccines(prev => prev.map(v => v.id === id ? { ...v, ...patch } : v));
+  };
+  const deleteVaccine = async (id) => { if (await deleteRow("health_vaccines", id)) setVaccines(prev => prev.filter(v => v.id !== id)); };
+
+  const addAllergy = async (a) => {
+    const row = await insertRow("health_allergies", familyId, { ...a, id: uid() });
+    if (row) setAllergies(prev => [...prev, row]);
+  };
+  const updateAllergy = async (id, patch) => {
+    if (await updateRow("health_allergies", id, patch)) setAllergies(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+  };
+  const deleteAllergy = async (id) => { if (await deleteRow("health_allergies", id)) setAllergies(prev => prev.filter(a => a.id !== id)); };
+
+  const addAppointment = async (a) => {
+    const row = await insertRow("health_appointments", familyId, { ...a, id: uid() });
+    if (row) setAppointments(prev => [...prev, row]);
+  };
+  const updateAppointment = async (id, patch) => {
+    if (await updateRow("health_appointments", id, patch)) setAppointments(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+  };
+  const deleteAppointment = async (id) => { if (await deleteRow("health_appointments", id)) setAppointments(prev => prev.filter(a => a.id !== id)); };
+
+  const addMeasurement = async (m) => {
+    const row = await insertRow("health_measurements", familyId, { ...m, id: uid() });
+    if (row) setMeasurements(prev => [...prev, row]);
+  };
+  const updateMeasurement = async (id, patch) => {
+    if (await updateRow("health_measurements", id, patch)) setMeasurements(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
+  };
+  const deleteMeasurement = async (id) => { if (await deleteRow("health_measurements", id)) setMeasurements(prev => prev.filter(m => m.id !== id)); };
+
+  // Documents médicaux (photo/PDF d'une prescription ou requête).
+  const addDocument = async (d) => {
+    const row = await insertRow("health_documents", familyId, { ...d, id: uid() });
+    if (row) setDocuments(prev => [...prev, row]);
+  };
+  const deleteDocument = async (id) => { if (await deleteRow("health_documents", id)) setDocuments(prev => prev.filter(d => d.id !== id)); };
+
+  // Médicaments — l'horaire de prise (times) sert à la fonction serveur
+  // check-reminders pour envoyer une alerte au bon moment, sans qu'on ait
+  // besoin de faire quoi que ce soit d'autre ici.
+  const addMedication = async (m) => {
+    const row = await insertRow("health_medications", familyId, { ...m, id: uid() });
+    if (row) setMedications(prev => [...prev, row]);
+  };
+  const updateMedication = async (id, patch) => {
+    if (await updateRow("health_medications", id, patch)) setMedications(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
+  };
+  const deleteMedication = async (id) => { if (await deleteRow("health_medications", id)) setMedications(prev => prev.filter(m => m.id !== id)); };
+
+  // Budget — volontairement simple : ajouter/modifier/retirer une
+  // transaction, un solde qui se recalcule tout seul à l'affichage. Rien à
+  // "cocher payé" ni de prévision automatique, exactement pour éviter les
+  // erreurs de l'ancien système séparé.
+  const addBudgetTx = async (t) => {
+    const row = await insertRow("budget_transactions", familyId, { ...t, id: uid() });
+    if (row) setBudgetTx(prev => [...prev, row]);
+  };
+  const updateBudgetTx = async (id, patch) => {
+    if (await updateRow("budget_transactions", id, patch)) setBudgetTx(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t));
+  };
+  const deleteBudgetTx = async (id) => { if (await deleteRow("budget_transactions", id)) setBudgetTx(prev => prev.filter(t => t.id !== id)); };
 
   const forcePushAll = async () => {
     if (!familyId) return false;
@@ -1179,6 +1273,8 @@ function App({ session }) {
             { id: "epicerie", label: tr("nav.grocery"), icon: ShoppingCart },
             { id: "idees", label: tr("nav.meals"), icon: ChefHat },
             { id: "taches", label: tr("nav.tasks"), icon: ListTodo },
+            { id: "sante", label: tr("nav.health"), icon: HeartPulse },
+            { id: "budget", label: tr("nav.budget"), icon: Wallet },
             { id: "params", label: tr("nav.settings"), icon: Settings },
           ]).map(t => {
             const Icon = t.icon;
@@ -1233,6 +1329,19 @@ function App({ session }) {
             rewardCharts={rewardCharts} onAddReward={() => setShowAddReward(true)} onEditReward={setEditingReward}
             onDeleteReward={deleteRewardChart} onMarkNight={markRewardNight} onUndoNight={undoRewardNight} onSetReward={setRewardChoice} />
         )}
+        {tab === "sante" && (
+          <Sante members={members} vaccines={vaccines} allergies={allergies} appointments={appointments} measurements={measurements}
+            documents={documents} medications={medications}
+            onAddVaccine={addVaccine} onUpdateVaccine={updateVaccine} onDeleteVaccine={deleteVaccine}
+            onAddAllergy={addAllergy} onUpdateAllergy={updateAllergy} onDeleteAllergy={deleteAllergy}
+            onAddAppointment={addAppointment} onUpdateAppointment={updateAppointment} onDeleteAppointment={deleteAppointment}
+            onAddMeasurement={addMeasurement} onUpdateMeasurement={updateMeasurement} onDeleteMeasurement={deleteMeasurement}
+            onAddDocument={addDocument} onDeleteDocument={deleteDocument}
+            onAddMedication={addMedication} onUpdateMedication={updateMedication} onDeleteMedication={deleteMedication} />
+        )}
+        {tab === "budget" && (
+          <Budget transactions={budgetTx} onAdd={addBudgetTx} onUpdate={updateBudgetTx} onDelete={deleteBudgetTx} />
+        )}
         {tab === "params" && (
           <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} familyInfo={familyInfo} />
         )}
@@ -1281,6 +1390,9 @@ function App({ session }) {
 const pageStyle = { minHeight: "100vh", background: COLORS.paper, fontFamily: "'IBM Plex Sans', sans-serif", color: COLORS.ink };
 const primaryBtn = { background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 600, fontSize: 13.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "'IBM Plex Sans', sans-serif" };
 const outlineBtn = { background: "#fff", color: COLORS.accentDark, border: `1.5px solid ${COLORS.accentDark}`, borderRadius: 8, padding: "9px 14px", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "'IBM Plex Sans', sans-serif" };
+const sectionTitleStyle = { fontSize: 20, fontWeight: 700, color: COLORS.ink, margin: 0, fontFamily: "'IBM Plex Sans', sans-serif" };
+const listRowStyle = { display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1.5px solid #EFE7D8", borderRadius: 10, padding: "12px 14px", marginBottom: 8 };
+const iconBtnStyle = { background: "none", border: "none", cursor: "pointer", color: COLORS.muted, display: "flex", padding: 4 };
 
 function EmptyState({ text, cta, onClick }) {
   return (
@@ -2177,6 +2289,547 @@ function Card({ title, children: c }) {
     </div>
   );
 }
+
+function GrowthChart({ measurements, lang }) {
+  const { t: tr } = useLanguage();
+  const sorted = [...measurements].sort((a, b) => a.measuredAt.localeCompare(b.measuredAt));
+  const weightPts = sorted.filter(m => m.weightKg != null);
+  const heightPts = sorted.filter(m => m.heightCm != null);
+  if (sorted.length < 2) return null;
+
+  const W = 640, H = 180, padL = 40, padR = 12, padT = 12, padB = 24;
+  const dates = sorted.map(m => new Date(m.measuredAt + "T00:00:00").getTime());
+  const minD = Math.min(...dates), maxD = Math.max(...dates);
+  const xFor = (d) => padL + (maxD === minD ? 0 : ((new Date(d + "T00:00:00").getTime() - minD) / (maxD - minD)) * (W - padL - padR));
+
+  const buildLine = (pts, valueKey) => {
+    if (pts.length < 2) return null;
+    const values = pts.map(p => p[valueKey]);
+    const minV = Math.min(...values) * 0.95, maxV = Math.max(...values) * 1.05;
+    const yFor = (v) => padT + (H - padT - padB) * (1 - (maxV === minV ? 0.5 : (v - minV) / (maxV - minV)));
+    const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.measuredAt).toFixed(1)} ${yFor(p[valueKey]).toFixed(1)}`).join(" ");
+    return { d, points: pts.map(p => ({ x: xFor(p.measuredAt), y: yFor(p[valueKey]), v: p[valueKey] })) };
+  };
+
+  const weightLine = buildLine(weightPts, "weightKg");
+  const heightLine = buildLine(heightPts, "heightCm");
+
+  return (
+    <div style={{ background: "#fff", border: "1.5px solid #EFE7D8", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+        {weightLine && <path d={weightLine.d} fill="none" stroke="#C97456" strokeWidth={2.5} />}
+        {weightLine && weightLine.points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill="#C97456" />)}
+        {heightLine && <path d={heightLine.d} fill="none" stroke="#6E9ECF" strokeWidth={2.5} strokeDasharray="5,4" />}
+        {heightLine && heightLine.points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill="#6E9ECF" />)}
+      </svg>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12 }}>
+        {weightLine && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 3, background: "#C97456", display: "inline-block" }} /> {tr("health.weightLegend")}</span>}
+        {heightLine && <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 3, background: "#6E9ECF", display: "inline-block" }} /> {tr("health.heightLegend")}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Sante({ members, vaccines, allergies, appointments, measurements, documents, medications,
+  onAddVaccine, onUpdateVaccine, onDeleteVaccine, onAddAllergy, onUpdateAllergy, onDeleteAllergy,
+  onAddAppointment, onUpdateAppointment, onDeleteAppointment, onAddMeasurement, onUpdateMeasurement, onDeleteMeasurement,
+  onAddDocument, onDeleteDocument, onAddMedication, onUpdateMedication, onDeleteMedication }) {
+  const { t: tr, lang } = useLanguage();
+  const [memberId, setMemberId] = useState(members[0]?.id || "");
+  const [section, setSection] = useState("vaccins");
+  const [showModal, setShowModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [viewingDoc, setViewingDoc] = useState(null);
+
+  useEffect(() => { if (!memberId && members[0]) setMemberId(members[0].id); }, [members]);
+
+  const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { year: "numeric", month: "short", day: "numeric" });
+
+  if (members.length === 0) {
+    return (
+      <div>
+        <h2 style={sectionTitleStyle}>{tr("nav.health")}</h2>
+        <EmptyState text={tr("health.addMembersFirst")} />
+      </div>
+    );
+  }
+
+  const memberVaccines = vaccines.filter(v => v.memberId === memberId).sort((a, b) => b.dateGiven.localeCompare(a.dateGiven));
+  const memberAllergies = allergies.filter(a => a.memberId === memberId);
+  const memberAppointments = appointments.filter(a => a.memberId === memberId).sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate));
+  const memberMeasurements = measurements.filter(m => m.memberId === memberId).sort((a, b) => b.measuredAt.localeCompare(a.measuredAt));
+  const memberDocuments = documents.filter(d => d.memberId === memberId).sort((a, b) => b.documentDate.localeCompare(a.documentDate));
+  const memberMedications = medications.filter(m => m.memberId === memberId).sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
+
+  const sections = [
+    ["vaccins", tr("health.vaccines"), Syringe],
+    ["allergies", tr("health.allergies"), AlertTriangle],
+    ["rdv", tr("health.appointments"), Stethoscope],
+    ["mesures", tr("health.measurements"), Ruler],
+    ["documents", tr("health.documents"), FileText],
+    ["medicaments", tr("health.medications"), Pill],
+  ];
+
+  const openAdd = () => { setEditingEntry(null); setShowModal(true); };
+  const openEdit = (entry) => { setEditingEntry(entry); setShowModal(true); };
+
+  const updaters = { vaccins: onUpdateVaccine, allergies: onUpdateAllergy, rdv: onUpdateAppointment, mesures: onUpdateMeasurement, medicaments: onUpdateMedication };
+  const adders = { vaccins: onAddVaccine, allergies: onAddAllergy, rdv: onAddAppointment, mesures: onAddMeasurement, medicaments: onAddMedication };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <h2 style={sectionTitleStyle}>{tr("nav.health")}</h2>
+        {section !== "documents" && <button onClick={openAdd} style={primaryBtn}><Plus size={16} /> {tr("action.add")}</button>}
+      </div>
+
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 14 }}>
+        {members.map(m => (
+          <button key={m.id} onClick={() => setMemberId(m.id)} style={{
+            padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${m.color}`,
+            background: memberId === m.id ? m.color : "transparent", color: memberId === m.id ? "#fff" : m.color,
+            fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+          }}>{m.name}</button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {sections.map(([key, label, Icon]) => (
+          <button key={key} onClick={() => setSection(key)} style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8,
+            border: `1.5px solid ${section === key ? COLORS.accentDark : "#D8D2BE"}`,
+            background: section === key ? COLORS.accentDark : "#fff", color: section === key ? "#fff" : COLORS.ink,
+            fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+          }}><Icon size={14} /> {label}</button>
+        ))}
+      </div>
+
+      {section === "vaccins" && (
+        memberVaccines.length === 0 ? <EmptyState text={tr("health.noVaccines")} /> : memberVaccines.map(v => (
+          <div key={v.id} style={listRowStyle}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{v.name}</div>
+              <div style={{ fontSize: 12, color: COLORS.muted }}>
+                {fmtDate(v.dateGiven)}{v.nextDueDate ? ` · ${tr("health.nextDue")} ${fmtDate(v.nextDueDate)}` : ""}
+              </div>
+              {v.notes && <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{v.notes}</div>}
+            </div>
+            <button onClick={() => openEdit(v)} style={iconBtnStyle}><Pencil size={15} /></button>
+            <button onClick={() => onDeleteVaccine(v.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+          </div>
+        ))
+      )}
+
+      {section === "allergies" && (
+        memberAllergies.length === 0 ? <EmptyState text={tr("health.noAllergies")} /> : memberAllergies.map(a => (
+          <div key={a.id} style={listRowStyle}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{a.allergen}</div>
+              <div style={{ fontSize: 12, color: a.severity === "severe" ? COLORS.danger : COLORS.muted }}>{tr(`health.severity.${a.severity}`)}</div>
+              {a.notes && <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{a.notes}</div>}
+            </div>
+            <button onClick={() => openEdit(a)} style={iconBtnStyle}><Pencil size={15} /></button>
+            <button onClick={() => onDeleteAllergy(a.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+          </div>
+        ))
+      )}
+
+      {section === "rdv" && (
+        memberAppointments.length === 0 ? <EmptyState text={tr("health.noAppointments")} /> : memberAppointments.map(a => (
+          <div key={a.id} style={listRowStyle}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</div>
+              <div style={{ fontSize: 12, color: COLORS.muted }}>
+                {fmtDate(a.appointmentDate)}{a.appointmentTime ? ` · ${a.appointmentTime}` : ""}{a.location ? ` · ${a.location}` : ""}
+              </div>
+              {a.notes && <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{a.notes}</div>}
+            </div>
+            <button onClick={() => openEdit(a)} style={iconBtnStyle}><Pencil size={15} /></button>
+            <button onClick={() => onDeleteAppointment(a.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+          </div>
+        ))
+      )}
+
+      {section === "mesures" && (
+        <>
+          <GrowthChart measurements={memberMeasurements} lang={lang} />
+          {memberMeasurements.length === 0 ? <EmptyState text={tr("health.noMeasurements")} /> : memberMeasurements.map(m => (
+            <div key={m.id} style={listRowStyle}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>
+                  {m.weightKg ? `${m.weightKg} kg` : ""}{m.weightKg && m.heightCm ? " · " : ""}{m.heightCm ? `${m.heightCm} cm` : ""}
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.muted }}>{fmtDate(m.measuredAt)}</div>
+              </div>
+              <button onClick={() => openEdit(m)} style={iconBtnStyle}><Pencil size={15} /></button>
+              <button onClick={() => onDeleteMeasurement(m.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {section === "documents" && (
+        <>
+          <button onClick={() => setShowModal(true)} style={{ ...primaryBtn, marginBottom: 14 }}><Camera size={16} /> {tr("health.addDocument")}</button>
+          {memberDocuments.length === 0 ? <EmptyState text={tr("health.noDocuments")} /> : memberDocuments.map(d => {
+            const isPdf = d.fileData?.startsWith("data:application/pdf");
+            return (
+              <div key={d.id} style={listRowStyle}>
+                <button onClick={() => setViewingDoc(d)} style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+                  {isPdf ? <FileText size={20} color={COLORS.muted} /> : <img src={d.fileData} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} />}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{d.title}</div>
+                    <div style={{ fontSize: 12, color: COLORS.muted }}>{fmtDate(d.documentDate)}</div>
+                  </div>
+                </button>
+                <button onClick={() => onDeleteDocument(d.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {section === "medicaments" && (
+        memberMedications.length === 0 ? <EmptyState text={tr("health.noMedications")} /> : memberMedications.map(m => (
+          <div key={m.id} style={{ ...listRowStyle, opacity: m.active ? 1 : 0.55 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{m.name}{!m.active && ` (${tr("health.stopped")})`}</div>
+              <div style={{ fontSize: 12, color: COLORS.muted }}>
+                {m.dosage ? `${m.dosage} · ` : ""}{(m.times || []).join(", ")}
+              </div>
+              {m.notes && <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{m.notes}</div>}
+            </div>
+            <button onClick={() => openEdit(m)} style={iconBtnStyle}><Pencil size={15} /></button>
+            <button onClick={() => onDeleteMedication(m.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+          </div>
+        ))
+      )}
+
+      {showModal && section !== "documents" && (
+        <HealthEntryModal section={section} memberId={memberId} editingEntry={editingEntry} onClose={() => { setShowModal(false); setEditingEntry(null); }}
+          onAdd={adders[section]} onUpdate={updaters[section]} />
+      )}
+      {showModal && section === "documents" && (
+        <DocumentModal memberId={memberId} onClose={() => setShowModal(false)} onSave={onAddDocument} />
+      )}
+      {viewingDoc && (
+        <ModalShell title={viewingDoc.title} onClose={() => setViewingDoc(null)}>
+          {viewingDoc.fileData?.startsWith("data:application/pdf") ? (
+            <a href={viewingDoc.fileData} download={viewingDoc.fileName || "document.pdf"} style={{ ...outlineBtn, width: "100%", justifyContent: "center", textDecoration: "none" }}>
+              <FileText size={16} /> {tr("health.openPdf")}
+            </a>
+          ) : (
+            <img src={viewingDoc.fileData} alt="" style={{ maxWidth: "100%", borderRadius: 8 }} />
+          )}
+        </ModalShell>
+      )}
+    </div>
+  );
+}
+
+function HealthEntryModal({ section, memberId, editingEntry, onClose, onAdd, onUpdate }) {
+  const { t: tr } = useLanguage();
+  const e = editingEntry;
+  const [name, setName] = useState(e ? (section === "allergies" ? e.allergen : section === "rdv" ? e.title : e.name || "") : "");
+  const [date, setDate] = useState(e ? (section === "vaccins" ? e.dateGiven : section === "rdv" ? e.appointmentDate : section === "mesures" ? e.measuredAt : todayStr()) : todayStr());
+  const [nextDueDate, setNextDueDate] = useState(e?.nextDueDate || "");
+  const [severity, setSeverity] = useState(e?.severity || "moderee");
+  const [time, setTime] = useState(e?.appointmentTime || "");
+  const [location, setLocation] = useState(e?.location || "");
+  const [weight, setWeight] = useState(e?.weightKg ?? "");
+  const [height, setHeight] = useState(e?.heightCm ?? "");
+  const [notes, setNotes] = useState(e?.notes || "");
+  // Médicament
+  const [dosage, setDosage] = useState(e?.dosage || "");
+  const [times, setTimes] = useState(e?.times?.length ? e.times : ["08:00"]);
+  const [startDate, setStartDate] = useState(e?.startDate || todayStr());
+  const [endDate, setEndDate] = useState(e?.endDate || "");
+  const [active, setActive] = useState(e?.active ?? true);
+  const [err, setErr] = useState("");
+
+  const titles = {
+    vaccins: e ? tr("health.editVaccine") : tr("health.addVaccine"),
+    allergies: e ? tr("health.editAllergy") : tr("health.addAllergy"),
+    rdv: e ? tr("health.editAppointment") : tr("health.addAppointment"),
+    mesures: e ? tr("health.editMeasurement") : tr("health.addMeasurement"),
+    medicaments: e ? tr("health.editMedication") : tr("health.addMedication"),
+  };
+
+  const addTime = () => setTimes(prev => [...prev, "12:00"]);
+  const removeTime = (i) => setTimes(prev => prev.filter((_, idx) => idx !== i));
+  const changeTime = (i, v) => setTimes(prev => prev.map((t, idx) => idx === i ? v : t));
+
+  const submit = (ev) => {
+    ev.preventDefault();
+    let payload;
+    if (section === "vaccins") {
+      if (!name.trim()) { setErr(tr("health.nameRequired")); return; }
+      payload = { memberId, name: name.trim(), dateGiven: date, nextDueDate: nextDueDate || null, notes: notes.trim() };
+    } else if (section === "allergies") {
+      if (!name.trim()) { setErr(tr("health.allergenRequired")); return; }
+      payload = { memberId, allergen: name.trim(), severity, notes: notes.trim() };
+    } else if (section === "rdv") {
+      if (!name.trim()) { setErr(tr("health.titleRequired")); return; }
+      payload = { memberId, title: name.trim(), appointmentDate: date, appointmentTime: time || null, location: location.trim(), notes: notes.trim() };
+    } else if (section === "mesures") {
+      if (!weight && !height) { setErr(tr("health.measurementRequired")); return; }
+      payload = { memberId, measuredAt: date, weightKg: weight ? Number(weight) : null, heightCm: height ? Number(height) : null, notes: notes.trim() };
+    } else {
+      if (!name.trim()) { setErr(tr("health.medNameRequired")); return; }
+      const cleanTimes = times.filter(Boolean);
+      if (cleanTimes.length === 0) { setErr(tr("health.medTimeRequired")); return; }
+      payload = { memberId, name: name.trim(), dosage: dosage.trim(), times: cleanTimes, startDate, endDate: endDate || null, notes: notes.trim(), active };
+    }
+    if (e) onUpdate(e.id, payload); else onAdd(payload);
+    onClose();
+  };
+
+  return (
+    <ModalShell title={titles[section]} onClose={onClose} onSubmit={submit}>
+      {(section === "vaccins" || section === "allergies" || section === "rdv" || section === "medicaments") && (
+        <>
+          <label style={labelStyle}>{section === "allergies" ? tr("health.allergen") : section === "rdv" ? tr("health.appointmentTitle") : section === "medicaments" ? tr("health.medicationName") : tr("health.vaccineName")}</label>
+          <input style={inputStyle} value={name} onChange={ev => setName(ev.target.value)} autoFocus />
+        </>
+      )}
+
+      {section === "vaccins" && (
+        <>
+          <label style={labelStyle}>{tr("health.dateGiven")}</label>
+          <input type="date" style={inputStyle} value={date} onChange={ev => setDate(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.nextDueOptional")}</label>
+          <input type="date" style={inputStyle} value={nextDueDate} onChange={ev => setNextDueDate(ev.target.value)} />
+        </>
+      )}
+
+      {section === "allergies" && (
+        <>
+          <label style={labelStyle}>{tr("health.severity")}</label>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[["legere", tr("health.severity.legere")], ["moderee", tr("health.severity.moderee")], ["severe", tr("health.severity.severe")]].map(([key, label]) => (
+              <button type="button" key={key} onClick={() => setSeverity(key)} style={{
+                flex: 1, padding: 10, borderRadius: 8, border: `1.5px solid ${severity === key ? COLORS.accentDark : "#D8D2BE"}`,
+                background: severity === key ? COLORS.accentDark : "#fff", color: severity === key ? "#fff" : COLORS.ink, fontWeight: 600, fontSize: 12.5,
+              }}>{label}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {section === "rdv" && (
+        <>
+          <label style={labelStyle}>{tr("health.appointmentDate")}</label>
+          <input type="date" style={inputStyle} value={date} onChange={ev => setDate(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.timeOptional")}</label>
+          <input type="time" style={inputStyle} value={time} onChange={ev => setTime(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.locationOptional")}</label>
+          <input style={inputStyle} value={location} onChange={ev => setLocation(ev.target.value)} />
+        </>
+      )}
+
+      {section === "mesures" && (
+        <>
+          <label style={labelStyle}>{tr("health.measurementDate")}</label>
+          <input type="date" style={inputStyle} value={date} onChange={ev => setDate(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.weightOptional")}</label>
+          <input type="number" step="0.1" style={inputStyle} value={weight} onChange={ev => setWeight(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.heightOptional")}</label>
+          <input type="number" step="0.1" style={inputStyle} value={height} onChange={ev => setHeight(ev.target.value)} />
+        </>
+      )}
+
+      {section === "medicaments" && (
+        <>
+          <label style={labelStyle}>{tr("health.dosageOptional")}</label>
+          <input style={inputStyle} value={dosage} onChange={ev => setDosage(ev.target.value)} placeholder={tr("health.dosagePlaceholder")} />
+          <label style={labelStyle}>{tr("health.doseTimes")}</label>
+          {times.map((t, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input type="time" style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={t} onChange={ev => changeTime(i, ev.target.value)} />
+              {times.length > 1 && <button type="button" onClick={() => removeTime(i)} style={iconBtnStyle}><X size={16} /></button>}
+            </div>
+          ))}
+          <button type="button" onClick={addTime} style={{ ...outlineBtn, marginBottom: 12 }}><Plus size={14} /> {tr("health.addTime")}</button>
+          <label style={labelStyle}>{tr("health.startDate")}</label>
+          <input type="date" style={inputStyle} value={startDate} onChange={ev => setStartDate(ev.target.value)} />
+          <label style={labelStyle}>{tr("health.endDateOptional")}</label>
+          <input type="date" style={inputStyle} value={endDate} onChange={ev => setEndDate(ev.target.value)} />
+          {e && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={active} onChange={ev => setActive(ev.target.checked)} />
+              <span style={{ fontSize: 13.5 }}>{tr("health.stillActive")}</span>
+            </label>
+          )}
+        </>
+      )}
+
+      <label style={labelStyle}>{tr("health.notesOptional")}</label>
+      <textarea style={{ ...inputStyle, minHeight: 50, resize: "vertical" }} value={notes} onChange={ev => setNotes(ev.target.value)} />
+
+      {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {e ? tr("action.save") : tr("action.add")}</button>
+    </ModalShell>
+  );
+}
+
+function DocumentModal({ memberId, onClose, onSave }) {
+  const { t: tr } = useLanguage();
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [fileData, setFileData] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleFile = async (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    setBusy(true); setErr("");
+    try {
+      if (file.type === "application/pdf") {
+        if (file.size > 4 * 1024 * 1024) { setErr(tr("meal.pdfTooLarge")); setBusy(false); return; }
+        setFileData(await readAsDataUrl(file));
+      } else {
+        setFileData(await resizeImage(file));
+      }
+      setFileName(file.name);
+    } catch { setErr(tr("meal.fileError")); }
+    setBusy(false);
+  };
+
+  const submit = (ev) => {
+    ev.preventDefault();
+    if (!title.trim()) { setErr(tr("health.documentTitleRequired")); return; }
+    if (!fileData) { setErr(tr("health.documentFileRequired")); return; }
+    onSave({ memberId, title: title.trim(), documentDate: date, fileData, fileName });
+    onClose();
+  };
+
+  return (
+    <ModalShell title={tr("health.addDocument")} onClose={onClose} onSubmit={submit}>
+      <label style={labelStyle}>{tr("health.documentTitle")}</label>
+      <input style={inputStyle} value={title} onChange={ev => setTitle(ev.target.value)} placeholder={tr("health.documentTitlePlaceholder")} autoFocus />
+      <label style={labelStyle}>{tr("health.documentDate")}</label>
+      <input type="date" style={inputStyle} value={date} onChange={ev => setDate(ev.target.value)} />
+      <label style={labelStyle}>{tr("health.documentFile")}</label>
+      <label style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        border: "1.5px dashed #D8D2BE", borderRadius: 8, padding: "16px", cursor: "pointer",
+        color: COLORS.muted, fontSize: 13, marginBottom: 12, background: "#fff",
+      }}>
+        <Camera size={18} />
+        {busy ? tr("meal.processing") : fileData ? `${tr("meal.addedFile")} : ${fileName} — ${tr("meal.tapToChange")}` : tr("meal.takePhoto")}
+        <input type="file" accept="image/*,application/pdf" capture="environment" onChange={handleFile} style={{ display: "none" }} />
+      </label>
+      {fileData && !fileData.startsWith("data:application/pdf") && <img src={fileData} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginBottom: 12 }} />}
+      {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }} disabled={busy}><Check size={16} /> {tr("action.add")}</button>
+    </ModalShell>
+  );
+}
+
+function Budget({ transactions, onAdd, onUpdate, onDelete }) {
+  const { t: tr, lang } = useLanguage();
+  const [showModal, setShowModal] = useState(false);
+  const [editingTx, setEditingTx] = useState(null);
+  const fmtDate = (d) => new Date(d + "T00:00:00").toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA", { year: "numeric", month: "short", day: "numeric" });
+  const fmtMoney = (n) => n.toLocaleString(lang === "en" ? "en-CA" : "fr-CA", { style: "currency", currency: "CAD" });
+
+  const sorted = [...transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+  const balance = transactions.reduce((sum, t) => sum + (t.kind === "revenu" ? t.amount : -t.amount), 0);
+  const now = new Date();
+  const thisMonth = transactions.filter(t => {
+    const d = new Date(t.transactionDate + "T00:00:00");
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const monthIncome = thisMonth.filter(t => t.kind === "revenu").reduce((s, t) => s + t.amount, 0);
+  const monthExpense = thisMonth.filter(t => t.kind === "depense").reduce((s, t) => s + t.amount, 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+        <h2 style={sectionTitleStyle}>{tr("nav.budget")}</h2>
+        <button onClick={() => { setEditingTx(null); setShowModal(true); }} style={primaryBtn}><Plus size={16} /> {tr("budget.add")}</button>
+      </div>
+
+      <div style={{ background: "#F0EAD8", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: COLORS.muted, marginBottom: 4 }}>{tr("budget.balance")}</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: balance >= 0 ? COLORS.ink : COLORS.danger }}>{fmtMoney(balance)}</div>
+        <div style={{ display: "flex", gap: 16, marginTop: 10, fontSize: 12.5 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#3A8A5A" }}><TrendingUp size={14} /> {fmtMoney(monthIncome)}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 4, color: COLORS.danger }}><TrendingDown size={14} /> {fmtMoney(monthExpense)}</span>
+          <span style={{ color: COLORS.muted }}>{tr("budget.thisMonth")}</span>
+        </div>
+      </div>
+
+      {sorted.length === 0 ? <EmptyState text={tr("budget.empty")} /> : sorted.map(t => (
+        <div key={t.id} style={listRowStyle}>
+          <button onClick={() => { setEditingTx(t); setShowModal(true); }} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{t.description}</div>
+            <div style={{ fontSize: 12, color: COLORS.muted }}>{fmtDate(t.transactionDate)} · {tr(`budget.cat.${t.category}`)}</div>
+          </button>
+          <div style={{ fontWeight: 700, fontSize: 14, color: t.kind === "revenu" ? "#3A8A5A" : COLORS.danger, marginRight: 8 }}>
+            {t.kind === "revenu" ? "+" : "−"}{fmtMoney(t.amount)}
+          </div>
+          <button onClick={() => onDelete(t.id)} style={iconBtnStyle}><Trash2 size={15} /></button>
+        </div>
+      ))}
+
+      {showModal && <BudgetTxModal editingTx={editingTx} onClose={() => { setShowModal(false); setEditingTx(null); }} onAdd={onAdd} onUpdate={onUpdate} />}
+    </div>
+  );
+}
+
+function BudgetTxModal({ editingTx, onClose, onAdd, onUpdate }) {
+  const { t: tr } = useLanguage();
+  const t = editingTx;
+  const [description, setDescription] = useState(t?.description || "");
+  const [amount, setAmount] = useState(t?.amount ?? "");
+  const [kind, setKind] = useState(t?.kind || "depense");
+  const [category, setCategory] = useState(t?.category || "autre");
+  const [date, setDate] = useState(t?.transactionDate || todayStr());
+  const [err, setErr] = useState("");
+
+  const categories = ["epicerie", "logement", "transport", "loisirs", "sante", "vetements", "salaire", "autre"];
+
+  const submit = (e) => {
+    e.preventDefault();
+    const n = Number(amount);
+    if (!description.trim()) { setErr(tr("budget.descriptionRequired")); return; }
+    if (!amount || isNaN(n) || n <= 0) { setErr(tr("budget.amountRequired")); return; }
+    const payload = { description: description.trim(), amount: n, kind, category, transactionDate: date, isRecurring: false };
+    if (t) onUpdate(t.id, payload); else onAdd(payload);
+    onClose();
+  };
+
+  return (
+    <ModalShell title={t ? tr("budget.edit") : tr("budget.add")} onClose={onClose} onSubmit={submit}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <button type="button" onClick={() => setKind("depense")} style={{
+          flex: 1, padding: 10, borderRadius: 8, border: `1.5px solid ${kind === "depense" ? COLORS.danger : "#D8D2BE"}`,
+          background: kind === "depense" ? COLORS.danger : "#fff", color: kind === "depense" ? "#fff" : COLORS.ink, fontWeight: 600, fontSize: 13,
+        }}>{tr("budget.expense")}</button>
+        <button type="button" onClick={() => setKind("revenu")} style={{
+          flex: 1, padding: 10, borderRadius: 8, border: `1.5px solid ${kind === "revenu" ? "#3A8A5A" : "#D8D2BE"}`,
+          background: kind === "revenu" ? "#3A8A5A" : "#fff", color: kind === "revenu" ? "#fff" : COLORS.ink, fontWeight: 600, fontSize: 13,
+        }}>{tr("budget.income")}</button>
+      </div>
+      <label style={labelStyle}>{tr("budget.description")}</label>
+      <input style={inputStyle} value={description} onChange={e => setDescription(e.target.value)} autoFocus />
+      <label style={labelStyle}>{tr("budget.amount")}</label>
+      <input type="number" step="0.01" style={inputStyle} value={amount} onChange={e => setAmount(e.target.value)} />
+      <label style={labelStyle}>{tr("budget.category")}</label>
+      <select style={inputStyle} value={category} onChange={e => setCategory(e.target.value)}>
+        {categories.map(c => <option key={c} value={c}>{tr(`budget.cat.${c}`)}</option>)}
+      </select>
+      <label style={labelStyle}>{tr("budget.date")}</label>
+      <input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} />
+      {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
+      <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {t ? tr("action.save") : tr("action.add")}</button>
+    </ModalShell>
+  );
+}
+
 
 function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, myMemberId, setMyMemberId, onExport, onImport, session, familyInfo }) {
   const { t: tr, lang, setLang } = useLanguage();
