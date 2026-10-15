@@ -526,31 +526,68 @@ async function openBillingPortal(setBusy, setError) {
 }
 
 function Paywall({ familyInfo }) {
+  const { t: tr } = useLanguage();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [packages, setPackages] = useState(null); // null = pas encore chargé, [] = aucun (ex. sur le web)
+
+  useEffect(() => {
+    let cancelled = false;
+    if (isNativeApp()) {
+      getOfferings().then(pkgs => { if (!cancelled) setPackages(pkgs); }).catch(() => { if (!cancelled) setPackages([]); });
+    } else {
+      setPackages([]);
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  // Cherche le vrai prix (et sa devise) directement chez Apple/Google via
+  // RevenueCat quand disponible — sinon, le prix affiché de secours plus bas
+  // (celui du web/Stripe) reste exact mais n'est pas dynamique.
+  const findPrice = (productIdSuffix) => {
+    const pkg = (packages || []).find(p => p.product.identifier.endsWith(productIdSuffix));
+    return pkg?.product?.priceString || null;
+  };
+  const monthlyPrice = findPrice(".monthly3") || "5,99 $";
+  const annualPrice = findPrice(".annual") || "59,99 $";
 
   return (
     <div style={{ minHeight: "100vh", background: "#EAE2CB", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'IBM Plex Sans', sans-serif" }}>
       <div style={{ width: "100%", maxWidth: 420, background: "#F7F3E3", borderRadius: 16, padding: 32, textAlign: "center", border: "1px solid #D8D2BE" }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>⏰</div>
-        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, marginTop: 0, marginBottom: 8 }}>Votre essai gratuit est terminé</h1>
-        <p style={{ fontSize: 14, color: "#7A7256", marginBottom: 24 }}>
-          Abonnez-vous pour continuer à utiliser votre épicerie, vos repas, vos tâches et vos routines familiales.
-        </p>
+        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, marginTop: 0, marginBottom: 8 }}>{tr("paywall.title")}</h1>
+        <p style={{ fontSize: 14, color: "#7A7256", marginBottom: 24 }}>{tr("paywall.subtitle")}</p>
         {error && <p style={{ color: "#B5715F", fontSize: 13, marginBottom: 14 }}>{error}</p>}
+
+        {/* Le prix total facturé est l'élément le plus visible de chaque
+            option (gros, gras, en premier) — tout le reste (durée, badge
+            "meilleure valeur") est volontairement plus petit et en dessous,
+            pour respecter les exigences d'Apple sur la clarté du prix. */}
         <button disabled={busy} onClick={() => startCheckout("monthly", setBusy, setError, () => window.location.reload())} style={{
-          width: "100%", padding: "13px 16px", borderRadius: 8, border: "none", background: "#8A6423",
-          color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 10, opacity: busy ? 0.6 : 1,
-        }}>S'abonner — mensuel</button>
+          width: "100%", padding: "14px 16px", borderRadius: 8, border: "none", background: "#8A6423",
+          color: "#fff", cursor: "pointer", marginBottom: 10, opacity: busy ? 0.6 : 1, textAlign: "center",
+        }}>
+          <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}>{monthlyPrice} <span style={{ fontSize: 13, fontWeight: 500 }}>{tr("paywall.perMonth")}</span></div>
+          <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.9, marginTop: 2 }}>{tr("paywall.monthlyLabel")}</div>
+        </button>
         <button disabled={busy} onClick={() => startCheckout("annual", setBusy, setError, () => window.location.reload())} style={{
-          width: "100%", padding: "13px 16px", borderRadius: 8, border: "1.5px solid #8A6423", background: "transparent",
-          color: "#8A6423", fontWeight: 700, fontSize: 15, cursor: "pointer", opacity: busy ? 0.6 : 1,
-        }}>S'abonner — annuel (meilleure valeur)</button>
+          width: "100%", padding: "14px 16px", borderRadius: 8, border: "1.5px solid #8A6423", background: "transparent",
+          color: "#8A6423", cursor: "pointer", opacity: busy ? 0.6 : 1, textAlign: "center",
+        }}>
+          <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}>{annualPrice} <span style={{ fontSize: 13, fontWeight: 500 }}>{tr("paywall.perYear")}</span></div>
+          <div style={{ fontSize: 12, fontWeight: 600, marginTop: 2 }}>{tr("paywall.annualLabel")} · {tr("paywall.bestValue")}</div>
+        </button>
+
         <p style={{ fontSize: 12, color: "#7A7256", marginTop: 18 }}>
-          {isNativeApp()
-            ? "L'achat se confirme directement avec votre compte Apple ou Google."
-            : "Vous serez redirigé vers une page de paiement sécurisée. Vos données vous attendent, elles ne sont pas perdues."}
+          {isNativeApp() ? tr("paywall.nativeNote") : tr("paywall.webNote")}
         </p>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, fontSize: 11.5, marginTop: 14 }}>
+          <a href="https://planifamille.com/politique-de-confidentialite" target="_blank" rel="noopener noreferrer" style={{ color: "#7A7256" }}>{tr("paywall.privacyLink")}</a>
+          <span style={{ color: "#D8D2BE" }}>·</span>
+          <a href="https://planifamille.com/conditions-utilisation" target="_blank" rel="noopener noreferrer" style={{ color: "#7A7256" }}>{tr("paywall.termsLink")}</a>
+        </div>
+
         {isNativeApp() && (
           <button
             disabled={busy}
@@ -559,20 +596,20 @@ function Paywall({ familyInfo }) {
               try {
                 const info = await restorePurchases();
                 if (hasActiveEntitlement(info)) window.location.reload();
-                else setError("Aucun achat actif à restaurer sur ce compte.");
-              } catch (err) { setError(err.message || "Impossible de restaurer les achats."); }
+                else setError(tr("paywall.noActivePurchase"));
+              } catch (err) { setError(err.message || tr("paywall.restoreFailed")); }
               setBusy(false);
             }}
-            style={{ background: "none", border: "none", color: "#7A7256", fontSize: 12.5, textDecoration: "underline", cursor: "pointer", marginTop: 8 }}
+            style={{ background: "none", border: "none", color: "#7A7256", fontSize: 12.5, textDecoration: "underline", cursor: "pointer", marginTop: 12 }}
           >
-            Restaurer mes achats
+            {tr("paywall.restore")}
           </button>
         )}
         <button
           onClick={() => supabase.auth.signOut()}
           style={{ background: "none", border: "none", color: "#7A7256", fontSize: 12, textDecoration: "underline", cursor: "pointer", marginTop: 14, display: "block", width: "100%" }}
         >
-          Se déconnecter
+          {tr("action.logout")}
         </button>
       </div>
     </div>
