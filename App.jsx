@@ -4,6 +4,7 @@ import AuthScreen, { ResetPasswordConfirm } from "./AuthScreen";
 import LandingPage from "./LandingPage";
 import { PrivacyPolicyPage, TermsPage, SupportPage } from "./LegalPages";
 import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { isNativeApp, initRevenueCat, getOfferings, purchasePackage, restorePurchases, hasActiveEntitlement } from "./revenuecat";
 import { useLanguage } from "./i18n.jsx";
 import {
@@ -551,6 +552,14 @@ function Paywall({ familyInfo }) {
   const monthlyPrice = findPrice(".monthly3") || "5,99 $";
   const annualPrice = findPrice(".annual") || "59,99 $";
 
+  // Dans l'app iOS, un lien target="_blank" ne s'ouvre pas toujours : on
+  // utilise le navigateur intégré d'iOS, qui affiche vraiment la page.
+  const openLegal = (e, url) => {
+    if (!isNativeApp()) return;
+    e.preventDefault();
+    Browser.open({ url }).catch(() => window.open(url, "_blank"));
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#EAE2CB", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'IBM Plex Sans', sans-serif" }}>
       <div style={{ width: "100%", maxWidth: 420, background: "#F7F3E3", borderRadius: 16, padding: 32, textAlign: "center", border: "1px solid #D8D2BE" }}>
@@ -559,33 +568,41 @@ function Paywall({ familyInfo }) {
         <p style={{ fontSize: 14, color: "#7A7256", marginBottom: 24 }}>{tr("paywall.subtitle")}</p>
         {error && <p style={{ color: "#B5715F", fontSize: 13, marginBottom: 14 }}>{error}</p>}
 
-        {/* Le prix total facturé est l'élément le plus visible de chaque
-            option (gros, gras, en premier) — tout le reste (durée, badge
-            "meilleure valeur") est volontairement plus petit et en dessous,
-            pour respecter les exigences d'Apple sur la clarté du prix. */}
-        <button disabled={busy} onClick={() => startCheckout("monthly", setBusy, setError, () => window.location.reload())} style={{
-          width: "100%", padding: "14px 16px", borderRadius: 8, border: "none", background: "#8A6423",
-          color: "#fff", cursor: "pointer", marginBottom: 10, opacity: busy ? 0.6 : 1, textAlign: "center",
-        }}>
-          <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}>{monthlyPrice} <span style={{ fontSize: 13, fontWeight: 500 }}>{tr("paywall.perMonth")}</span></div>
-          <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.9, marginTop: 2 }}>{tr("paywall.monthlyLabel")}</div>
-        </button>
-        <button disabled={busy} onClick={() => startCheckout("annual", setBusy, setError, () => window.location.reload())} style={{
-          width: "100%", padding: "14px 16px", borderRadius: 8, border: "1.5px solid #8A6423", background: "transparent",
-          color: "#8A6423", cursor: "pointer", opacity: busy ? 0.6 : 1, textAlign: "center",
-        }}>
-          <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1.2 }}>{annualPrice} <span style={{ fontSize: 13, fontWeight: 500 }}>{tr("paywall.perYear")}</span></div>
-          <div style={{ fontSize: 12, fontWeight: 600, marginTop: 2 }}>{tr("paywall.annualLabel")} · {tr("paywall.bestValue")}</div>
-        </button>
+        {/* Chaque formule : le montant facturé est de loin l'élément le plus
+            grand et le plus gras (30 px, couleur la plus foncée, au centre de
+            la carte). Le titre, la durée et "meilleure valeur" sont plus
+            petits et placés autour — exigence d'Apple (3.1.2c). */}
+        {[
+          { key: "monthly", title: tr("paywall.monthlyTitle"), price: monthlyPrice, per: tr("paywall.perMonth"), badge: null, filled: true },
+          { key: "annual", title: tr("paywall.annualTitle"), price: annualPrice, per: tr("paywall.perYear"), badge: tr("paywall.bestValue"), filled: false },
+        ].map(plan => (
+          <div key={plan.key} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 12, padding: 16, marginBottom: 12, textAlign: "center" }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#7A7256" }}>{plan.title}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: COLORS.ink, lineHeight: 1.15, margin: "6px 0 2px" }}>
+              {plan.price}
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#7A7256" }}> {plan.per}</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: "#8A6423", minHeight: 16, marginBottom: 10 }}>{plan.badge || "\u00A0"}</div>
+            <button disabled={busy} onClick={() => startCheckout(plan.key, setBusy, setError, () => window.location.reload())} style={{
+              width: "100%", padding: "12px 16px", borderRadius: 8,
+              border: plan.filled ? "none" : "1.5px solid #8A6423",
+              background: plan.filled ? "#8A6423" : "transparent", color: plan.filled ? "#fff" : "#8A6423",
+              fontWeight: 700, fontSize: 14, cursor: "pointer", opacity: busy ? 0.6 : 1,
+            }}>{tr("paywall.subscribe")}</button>
+          </div>
+        ))}
 
-        <p style={{ fontSize: 12, color: "#7A7256", marginTop: 18 }}>
+        <p style={{ fontSize: 12, color: "#7A7256", marginTop: 14, lineHeight: 1.5 }}>
+          {isNativeApp() ? tr("paywall.autoRenewNative") : tr("paywall.autoRenewWeb")}
+        </p>
+        <p style={{ fontSize: 12, color: "#7A7256", marginTop: 6 }}>
           {isNativeApp() ? tr("paywall.nativeNote") : tr("paywall.webNote")}
         </p>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 10, fontSize: 11.5, marginTop: 14 }}>
-          <a href="https://planifamille.com/politique-de-confidentialite" target="_blank" rel="noopener noreferrer" style={{ color: "#7A7256" }}>{tr("paywall.privacyLink")}</a>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, fontSize: 13, marginTop: 14 }}>
+          <a href="https://planifamille.com/politique-de-confidentialite" onClick={(e) => openLegal(e, "https://planifamille.com/politique-de-confidentialite")} target="_blank" rel="noopener noreferrer" style={{ color: "#6B5320", textDecoration: "underline" }}>{tr("paywall.privacyLink")}</a>
           <span style={{ color: "#D8D2BE" }}>·</span>
-          <a href="https://planifamille.com/conditions-utilisation" target="_blank" rel="noopener noreferrer" style={{ color: "#7A7256" }}>{tr("paywall.termsLink")}</a>
+          <a href="https://planifamille.com/conditions-utilisation" onClick={(e) => openLegal(e, "https://planifamille.com/conditions-utilisation")} target="_blank" rel="noopener noreferrer" style={{ color: "#6B5320", textDecoration: "underline" }}>{tr("paywall.termsLink")}</a>
         </div>
 
         {isNativeApp() && (
