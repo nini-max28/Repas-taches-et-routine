@@ -1046,7 +1046,22 @@ function App({ session }) {
   const addTask = (t) => persistTasks([...tasks, { id: uid(), lastDoneDate: null, ...t }]);
   const updateTask = (id, patch) => persistTasks(tasks.map(t => t.id === id ? { ...t, ...patch } : t));
   const deleteTask = (id) => persistTasks(tasks.filter(t => t.id !== id));
-  const toggleTaskDone = (task) => updateTask(task.id, { lastDoneDate: isTaskDone(task) ? null : todayStr() });
+  // Une tâche "à la demande" (ex. vider le lave-vaisselle) n'est due que quand
+  // un parent la demande, et redevient "pas due" dès qu'elle est faite.
+  const toggleTaskDone = (task) => updateTask(task.id, { lastDoneDate: isTaskDone(task) ? null : todayStr(), ...(task.onDemand ? { requested: false } : {}) });
+
+  const requestTask = (task) => {
+    updateTask(task.id, { requested: true, lastDoneDate: null });
+    const isRot = task.rotation && task.rotation.length > 0;
+    const memberId = isRot ? task.rotation[task.rotationIndex % task.rotation.length] : task.assignedTo;
+    const member = members.find(m => m.id === memberId);
+    if (member && familyId) {
+      supabase.functions.invoke("notify", {
+        body: { action: "send", familyId, memberId: member.id, title: "📋 Une tâche t'attend", body: `${member.name}, c'est le moment de : "${task.title}"!`, notifyParent: !!task.notifyParent },
+      }).catch(() => { /* silencieux — la tâche est quand même marquée comme demandée */ });
+    }
+  };
+  const cancelTaskRequest = (task) => updateTask(task.id, { requested: false });
 
   // Coche/décoche une étape d'une routine visuelle pour aujourd'hui. Quand toutes
   // les étapes sont cochées, on marque aussi lastDoneDate — pour que le backend
@@ -1092,13 +1107,14 @@ function App({ session }) {
     const debtOwed = (task.makeupDebt || {})[currentMemberId] || 0;
     if (debtOwed > 0) {
       const makeupDebt = { ...(task.makeupDebt || {}), [currentMemberId]: debtOwed - 1 };
-      updateTask(task.id, { lastDoneDate: todayStr(), turnStartDate: todayStr(), completions, makeupDebt });
+      updateTask(task.id, { lastDoneDate: todayStr(), turnStartDate: todayStr(), completions, makeupDebt, ...(task.onDemand ? { requested: false } : {}) });
       return;
     }
 
     const nextIndex = (task.rotationIndex + 1) % task.rotation.length;
-    updateTask(task.id, { rotationIndex: nextIndex, lastDoneDate: todayStr(), turnStartDate: todayStr(), completions });
-    notifyTurn(task, members.find(m => m.id === task.rotation[nextIndex]));
+    updateTask(task.id, { rotationIndex: nextIndex, lastDoneDate: todayStr(), turnStartDate: todayStr(), completions, ...(task.onDemand ? { requested: false } : {}) });
+    // Pour une tâche "à la demande", on n'avertit pas la personne suivante : elle le sera quand un parent demandera la tâche.
+    if (!task.onDemand) notifyTurn(task, members.find(m => m.id === task.rotation[nextIndex]));
   };
 
   // Utilisé quand la personne dont c'est le tour est absente et qu'une autre
@@ -1109,8 +1125,8 @@ function App({ session }) {
     const completions = { ...(task.completions || {}), [coveringMemberId]: ((task.completions || {})[coveringMemberId] || 0) + 1 };
     const makeupDebt = { ...(task.makeupDebt || {}), [absentMemberId]: ((task.makeupDebt || {})[absentMemberId] || 0) + 1 };
     const nextIndex = (task.rotationIndex + 1) % task.rotation.length;
-    updateTask(task.id, { rotationIndex: nextIndex, lastDoneDate: todayStr(), turnStartDate: todayStr(), completions, makeupDebt });
-    notifyTurn(task, members.find(m => m.id === task.rotation[nextIndex]));
+    updateTask(task.id, { rotationIndex: nextIndex, lastDoneDate: todayStr(), turnStartDate: todayStr(), completions, makeupDebt, ...(task.onDemand ? { requested: false } : {}) });
+    if (!task.onDemand) notifyTurn(task, members.find(m => m.id === task.rotation[nextIndex]));
   };
 
   const addGroceryItem = (item) => persistGrocery([...groceryItems, { id: uid(), checked: false, ...item }]);
@@ -1395,7 +1411,7 @@ function App({ session }) {
           <Taches members={members} tasks={tasks} onAddMember={() => setShowAddMember(true)} onDeleteMember={deleteMember}
             onEditMember={setEditingMember} myMemberId={myMemberId}
             onAddTask={() => setShowAddTask(true)} onEditTask={setEditingTask} onDeleteTask={deleteTask}
-            onToggleTask={toggleTaskDone} onRotateTask={rotateTask} onCoverAbsence={coverAbsence} onToggleRoutineStep={toggleRoutineStep}
+            onToggleTask={toggleTaskDone} onRotateTask={rotateTask} onCoverAbsence={coverAbsence} onToggleRoutineStep={toggleRoutineStep} onRequestTask={requestTask} onCancelRequest={cancelTaskRequest}
             rewardCharts={rewardCharts} onAddReward={() => setShowAddReward(true)} onEditReward={setEditingReward}
             onDeleteReward={deleteRewardChart} onMarkNight={markRewardNight} onUndoNight={undoRewardNight} onSetReward={setRewardChoice} />
         )}
@@ -1757,7 +1773,7 @@ function MemberAvatar({ member, size = 32 }) {
   );
 }
 
-function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myMemberId, onAddTask, onEditTask, onDeleteTask, onToggleTask, onRotateTask, onCoverAbsence, onToggleRoutineStep, rewardCharts, onAddReward, onEditReward, onDeleteReward, onMarkNight, onUndoNight, onSetReward }) {
+function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myMemberId, onAddTask, onEditTask, onDeleteTask, onToggleTask, onRotateTask, onCoverAbsence, onToggleRoutineStep, rewardCharts, onAddReward, onEditReward, onDeleteReward, onMarkNight, onUndoNight, onSetReward, onRequestTask, onCancelRequest }) {
   const { t: tr } = useLanguage();
   const [coveringFor, setCoveringFor] = useState(null); // id de la tâche pour laquelle on choisit qui a couvert
   const [filter, setFilter] = useState(myMemberId || "all");
@@ -1775,19 +1791,22 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
   // pas la personne : une routine reste une routine peu importe qui la fait.
   const routines = filtered.filter(t => t.type === "routine");
   const chores = filtered.filter(t => t.type !== "routine");
-  const active = chores.filter(t => !isTaskDone(t));
-  const done = chores.filter(t => isTaskDone(t));
+  const isNotDue = (t) => t.onDemand && !t.requested;
+  const notDue = chores.filter(isNotDue);
+  const active = chores.filter(t => !isNotDue(t) && !isTaskDone(t));
+  const done = chores.filter(t => !isNotDue(t) && isTaskDone(t));
 
   const renderTask = (t) => {
     const isRotation = t.rotation && t.rotation.length > 0;
     const currentTurnMember = isRotation ? memberById(t.rotation[t.rotationIndex % t.rotation.length]) : null;
     const m = isRotation ? currentTurnMember : memberById(t.assignedTo);
-    const complete = isTaskDone(t);
+    const notDueYet = isNotDue(t);
+    const complete = !notDueYet && isTaskDone(t);
     const debtOwed = (t.makeupDebt || {})[currentTurnMember?.id] || 0;
     return (
       <div key={t.id} style={{ marginBottom: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: COLORS.card, borderRadius: 8, opacity: complete ? 0.55 : 1 }}>
-          <button onClick={() => isRotation ? onRotateTask(t) : onToggleTask(t)} style={{
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: COLORS.card, borderRadius: 8, opacity: complete ? 0.55 : notDueYet ? 0.75 : 1 }}>
+          <button disabled={notDueYet} onClick={() => isRotation ? onRotateTask(t) : onToggleTask(t)} style={{
             width: 22, height: 22, borderRadius: 6, border: `2px solid ${complete ? COLORS.accent : "#C7C2AE"}`,
             background: complete ? COLORS.accent : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer",
           }} title={isRotation ? "Fait — passer le tour" : undefined}>{complete && <Check size={14} color="#fff" strokeWidth={3} />}</button>
@@ -1812,9 +1831,14 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
                 )}
               </>
             ) : (
-              <div style={{ fontSize: 11.5, color: COLORS.muted }}>{TASK_FREQUENCIES[t.frequency]}{(t.frequency === "hebdomadaire" || t.frequency === "auxDeuxSemaines") && Number.isInteger(t.dueDayOfWeek) ? ` · ${DAY_NAMES[t.dueDayOfWeek]}` : ""}{t.dueDate ? ` · ${fmtDayLabel(t.dueDate)}` : ""}</div>
+              <div style={{ fontSize: 11.5, color: COLORS.muted }}>{t.onDemand ? tr("task.onDemandLabel") : TASK_FREQUENCIES[t.frequency]}{!t.onDemand && (t.frequency === "hebdomadaire" || t.frequency === "auxDeuxSemaines") && Number.isInteger(t.dueDayOfWeek) ? ` · ${DAY_NAMES[t.dueDayOfWeek]}` : ""}{t.dueDate ? ` · ${fmtDayLabel(t.dueDate)}` : ""}</div>
             )}
           </div>
+          {t.onDemand && (notDueYet ? (
+            <button onClick={() => onRequestTask(t)} style={{ ...outlineBtn, padding: "5px 9px", fontSize: 11.5, whiteSpace: "nowrap" }}>🔔 {tr("tasks.requestNow")}</button>
+          ) : (
+            <button onClick={() => onCancelRequest(t)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, fontSize: 11, textDecoration: "underline", whiteSpace: "nowrap" }}>{tr("tasks.requested")} · {tr("tasks.cancelRequest")}</button>
+          ))}
           {m && <MemberAvatar member={m} size={26} />}
           <button onClick={() => onEditTask(t)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.muted, padding: 2 }}><Pencil size={14} /></button>
           <button onClick={() => onDeleteTask(t.id)} style={{ background: "none", border: "none", cursor: "pointer", color: COLORS.danger, padding: 2 }}><Trash2 size={14} /></button>
@@ -1905,6 +1929,10 @@ function Taches({ members, tasks, onAddMember, onDeleteMember, onEditMember, myM
           <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", marginBottom: 6 }}>{tr("tasks.sectionTasks")}</div>
           {active.length > 0 && active.map(renderTask)}
           {active.length === 0 && <p style={{ fontSize: 13, color: COLORS.muted, marginBottom: 10 }}>{tr("tasks.allDone")}</p>}
+          {notDue.length > 0 && <>
+            <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", margin: "16px 0 6px" }}>{tr("tasks.sectionNotDue")}</div>
+            {notDue.map(renderTask)}
+          </>}
           {done.length > 0 && <>
             <div className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: COLORS.muted, textTransform: "uppercase", margin: "16px 0 6px" }}>{tr("tasks.sectionDone")}</div>
             {done.map(renderTask)}
@@ -3459,6 +3487,7 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
   const [dueDayOfWeek, setDueDayOfWeek] = useState(Number.isInteger(task?.dueDayOfWeek) ? task.dueDayOfWeek : "");
   const [rotation, setRotation] = useState(task?.rotation || []);
   const [rotationAuto, setRotationAuto] = useState(task?.rotationAuto || "");
+  const [onDemand, setOnDemand] = useState(!!task?.onDemand);
   const [rotationDayOfWeek, setRotationDayOfWeek] = useState(Number.isInteger(task?.rotationDayOfWeek) ? task.rotationDayOfWeek : "");
   const [notifyParent, setNotifyParent] = useState(task?.notifyParent || false);
   const [steps, setSteps] = useState(task?.steps || []);
@@ -3488,21 +3517,24 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
         title: title.trim(), type: "routine", steps, checkedSteps: task?.checkedSteps || {},
         assignedTo: assignedTo || null, notifyParent, notifyTime: notifyTime || null, linkedRewardChartId: linkedRewardChartId || null,
         rotation: null, rotationIndex: 0, rotationAuto: null, frequency: null, dueDate: "", dueDayOfWeek: null,
+        onDemand: false, requested: false,
       });
     } else if (mode === "rotation") {
       if (rotation.length < 2) { setErr(tr("task.needTwoPeople")); return; }
       onSave({
         title: title.trim(), type: "chore", rotation, rotationIndex: task?.rotationIndex || 0, turnStartDate: task?.turnStartDate || todayStr(),
-        rotationAuto: rotationAuto || null,
-        rotationDayOfWeek: rotationAuto === "hebdomadaire" && rotationDayOfWeek !== "" ? Number(rotationDayOfWeek) : null,
+        rotationAuto: onDemand ? null : (rotationAuto || null),
+        rotationDayOfWeek: !onDemand && rotationAuto === "hebdomadaire" && rotationDayOfWeek !== "" ? Number(rotationDayOfWeek) : null,
         assignedTo: null, frequency: null, dueDate: "", dueDayOfWeek: null, notifyParent, steps: [],
+        onDemand, requested: onDemand ? !!task?.requested : false,
       });
     } else {
       onSave({
-        title: title.trim(), type: "chore", assignedTo: assignedTo || null, frequency,
-        dueDate: frequency === "unique" ? dueDate : "",
-        dueDayOfWeek: (frequency === "hebdomadaire" || frequency === "auxDeuxSemaines") && dueDayOfWeek !== "" ? Number(dueDayOfWeek) : null,
+        title: title.trim(), type: "chore", assignedTo: assignedTo || null, frequency: onDemand ? "unique" : frequency,
+        dueDate: !onDemand && frequency === "unique" ? dueDate : "",
+        dueDayOfWeek: !onDemand && (frequency === "hebdomadaire" || frequency === "auxDeuxSemaines") && dueDayOfWeek !== "" ? Number(dueDayOfWeek) : null,
         rotation: null, rotationIndex: 0, rotationAuto: null, notifyParent, steps: [],
+        onDemand, requested: onDemand ? !!task?.requested : false,
       });
     }
   };
@@ -3521,6 +3553,16 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
           }}>{label}</button>
         ))}
       </div>
+
+      {mode !== "routine" && (
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#F0EAD8", borderRadius: 8, marginBottom: 14, cursor: "pointer" }}>
+          <input type="checkbox" checked={onDemand} onChange={e => setOnDemand(e.target.checked)} style={{ marginTop: 2 }} />
+          <span>
+            <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{tr("task.onDemand")}</span>
+            <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{tr("task.onDemandHelp")}</span>
+          </span>
+        </label>
+      )}
 
       {mode === "routine" ? (
         <>
@@ -3600,6 +3642,8 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
             <option value="">{tr("task.notAssigned")}</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
+          {!onDemand && (
+          <>
           <label style={labelStyle}>{tr("task.frequency")}</label>
           <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
             {Object.entries(TASK_FREQUENCIES).map(([key, label]) => (
@@ -3637,6 +3681,8 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
               </p>
             </>
           )}
+          </>
+          )}
         </>
       ) : (
         <>
@@ -3661,6 +3707,8 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
           <p style={{ fontSize: 12, color: COLORS.muted, marginTop: -4, marginBottom: 12 }}>
             {tr("task.rotationHelp")}
           </p>
+          {!onDemand && (
+          <>
           <label style={labelStyle}>{tr("task.autoRotate")}</label>
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
             {[["", tr("task.manual")], ["quotidien", tr("task.daily")], ["hebdomadaire", tr("task.weekly")], ["auxDeuxSemaines", tr("task.biweekly")]].map(([key, label]) => (
@@ -3694,6 +3742,8 @@ function TaskModal({ members, task, rewardCharts, onClose, onSave }) {
                 Ex. laver les draps chaque samedi — le tour changera précisément ce jour-là, chaque semaine.
               </p>
             </>
+          )}
+          </>
           )}
         </>
       )}
