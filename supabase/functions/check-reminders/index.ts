@@ -110,7 +110,13 @@ Deno.serve(async () => {
 
     for (const task of chores || []) {
       let memberId: string | null = null;
-      if (task.rotation && task.rotation.length) {
+      if (task.on_demand) {
+        // Tâche "à la demande" : aucun rappel tant qu'un parent ne l'a pas demandée.
+        if (!task.requested) continue;
+        memberId = task.rotation && task.rotation.length
+          ? task.rotation[task.rotation_index % task.rotation.length]
+          : task.assigned_to;
+      } else if (task.rotation && task.rotation.length) {
         memberId = task.rotation[task.rotation_index % task.rotation.length];
       } else if (task.frequency === "quotidien" && task.last_done_date !== dateStr) {
         memberId = task.assigned_to;
