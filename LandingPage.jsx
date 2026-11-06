@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLanguage } from "./i18n.jsx";
+import { Capacitor } from "@capacitor/core";
 
 const COLORS = { paper: "#F5E7DA", card: "#FDF6EE", rule: "#EFD9C7", ink: "#3A2A20", muted: "#8A6F60", accent: "#DD8468", accentDark: "#C97456" };
 
@@ -89,6 +90,15 @@ export default function LandingPage({ onStart, onLogin }) {
             {t("landing.cta")}
           </button>
           <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 10 }}>{t("landing.noCard")}</p>
+          {/* Lien vers la fiche de l'app sur l'App Store — masqué dans l'app iOS elle-même, où il serait inutile. */}
+          {!Capacitor.isNativePlatform() && (
+            <a href="https://apps.apple.com/app/planifamille/id6813159281" target="_blank" rel="noopener noreferrer" style={{
+              display: "inline-block", marginTop: 18, padding: "11px 22px", borderRadius: 10,
+              background: COLORS.ink, color: "#fff", fontWeight: 600, fontSize: 14, textDecoration: "none",
+            }}>
+              {t("landing.appStore")}
+            </a>
+          )}
         </div>
 
         <InstallBanner />
