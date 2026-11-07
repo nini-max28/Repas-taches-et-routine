@@ -44,6 +44,7 @@ function build(p: Pending) {
       html: wrap(`
         <h2 style="margin:0 0 8px">Bienvenue sur Planifamille 🎈</h2>
         <p>Merci de votre confiance, nous sommes heureux de vous accueillir.</p>
+        <p>Avec 4 enfants à la maison, je sais très bien que les journées peuvent être très chargées. Planifamille est là pour libérer un peu notre charge à tous.</p>
         <p><strong>Pourquoi Planifamille?</strong> Organiser une famille, c'est beaucoup à porter : l'épicerie, les repas, les corvées, les routines du matin et du dodo. Planifamille réunit tout ça au même endroit, simplement, pour alléger la charge mentale des parents et faire participer les enfants, avec des routines visuelles, des tâches qui tournent entre les membres de la famille et des défis récompense.</p>
         <p>Votre essai gratuit de 7 jours est en cours, sans carte de crédit.</p>
         <p><strong>Pour bien démarrer :</strong></p>
@@ -52,9 +53,11 @@ function build(p: Pending) {
         <li>Créez une routine ou un défi récompense pour vos enfants.</li></ol>
         ${button("Ouvrir Planifamille")}
         <p>Une question? Répondez à ce courriel ou écrivez-nous à info@planifamille.com.</p>
+        <p>— Stéphanie, Planifamille</p>
         <hr style="border:none;border-top:1px dashed #EFD9C7;margin:22px 0">
         <h2 style="margin:0 0 8px">Welcome to Planifamille 🎈</h2>
         <p>Thank you for your trust, we're glad to have you.</p>
+        <p>With 4 kids at home, I know very well how busy days can get. Planifamille is here to lift a little of that load for all of us.</p>
         <p><strong>Why Planifamille?</strong> Running a family is a lot to carry: groceries, meals, chores, morning and bedtime routines. Planifamille brings it all together in one simple place, to lighten parents' mental load and get kids involved, with visual routines, chores that rotate between family members, and reward charts.</p>
         <p>Your 7-day free trial is underway, no credit card needed.</p>
         <p><strong>To get started:</strong></p>
@@ -62,8 +65,9 @@ function build(p: Pending) {
         <li>Add your first grocery items or pick some meal ideas.</li>
         <li>Create a routine or a reward chart for your children.</li></ol>
         ${button("Open Planifamille")}
-        <p>Questions? Reply to this email or write to info@planifamille.com.</p>`),
-      text: `Bienvenue sur Planifamille!\n\nMerci de votre confiance, nous sommes heureux de vous accueillir.\n\nPourquoi Planifamille? Organiser une famille, c'est beaucoup à porter : l'épicerie, les repas, les corvées, les routines. Planifamille réunit tout ça au même endroit pour alléger la charge mentale des parents et faire participer les enfants.\n\nVotre essai gratuit de 7 jours est en cours, sans carte de crédit.\n1. Dans l'onglet Tâches, ajoutez les membres de votre famille.\n2. Ajoutez vos premiers articles d'épicerie ou idées de repas.\n3. Créez une routine ou un défi récompense.\n\n${SITE}\nUne question? info@planifamille.com\n\n---\n\nWelcome to Planifamille!\n\nThank you for your trust, we're glad to have you.\n\nWhy Planifamille? Running a family is a lot to carry: groceries, meals, chores, routines. Planifamille brings it all together in one place to lighten parents' mental load and get kids involved.\n\nYour 7-day free trial is underway, no credit card needed.\n1. In the Tasks tab, add your family members.\n2. Add your first grocery items or meal ideas.\n3. Create a routine or a reward chart.\n\n${SITE}\nQuestions? info@planifamille.com`,
+        <p>Questions? Reply to this email or write to info@planifamille.com.</p>
+        <p>— Stéphanie, Planifamille</p>`),
+      text: `Bienvenue sur Planifamille!\n\nMerci de votre confiance, nous sommes heureux de vous accueillir.\n\nAvec 4 enfants à la maison, je sais très bien que les journées peuvent être très chargées. Planifamille est là pour libérer un peu notre charge à tous.\n\nPourquoi Planifamille? Organiser une famille, c'est beaucoup à porter : l'épicerie, les repas, les corvées, les routines. Planifamille réunit tout ça au même endroit pour alléger la charge mentale des parents et faire participer les enfants.\n\nVotre essai gratuit de 7 jours est en cours, sans carte de crédit.\n1. Dans l'onglet Tâches, ajoutez les membres de votre famille.\n2. Ajoutez vos premiers articles d'épicerie ou idées de repas.\n3. Créez une routine ou un défi récompense.\n\n${SITE}\nUne question? info@planifamille.com\n— Stéphanie, Planifamille\n\n---\n\nWelcome to Planifamille!\n\nThank you for your trust, we're glad to have you.\n\nWith 4 kids at home, I know very well how busy days can get. Planifamille is here to lift a little of that load for all of us.\n\nWhy Planifamille? Running a family is a lot to carry: groceries, meals, chores, routines. Planifamille brings it all together in one place to lighten parents' mental load and get kids involved.\n\nYour 7-day free trial is underway, no credit card needed.\n1. In the Tasks tab, add your family members.\n2. Add your first grocery items or meal ideas.\n3. Create a routine or a reward chart.\n\n${SITE}\nQuestions? info@planifamille.com\n— Stéphanie, Planifamille`,
     };
   }
 
