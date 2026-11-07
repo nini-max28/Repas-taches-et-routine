@@ -1401,7 +1401,7 @@ function App({ session }) {
             onAddIngredients={addIngredientsToGrocery} />
         )}
         {tab === "epicerie" && (
-          <Epicerie items={groceryItems} settings={settings} onAdd={() => setShowAddItem(true)} onToggle={toggleGroceryItem}
+          <Epicerie items={groceryItems} settings={settings} familyId={familyId} onAdd={() => setShowAddItem(true)} onToggle={toggleGroceryItem}
             onDelete={deleteGroceryItem} onClearChecked={clearChecked} onReset={resetGroceryList} />
         )}
         {tab === "idees" && (
@@ -1563,7 +1563,7 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
 }
 
 
-function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, onReset }) {
+function Epicerie({ items, settings, familyId, onAdd, onToggle, onDelete, onClearChecked, onReset }) {
   const { t: tr } = useLanguage();
   const grouped = AISLES.map(a => ({ ...a, items: items.filter(i => i.aisle === a.id) })).filter(a => a.items.length > 0);
   const hasChecked = items.some(i => i.checked);
@@ -1574,18 +1574,16 @@ function Epicerie({ items, settings, onAdd, onToggle, onDelete, onClearChecked, 
   const unchecked = items.filter(i => !i.checked);
 
   const sendList = async () => {
-    if (!settings.backendUrl) { setSendMsg("❌ Configurez d'abord l'adresse du backend dans Réglages."); return; }
-    if (phones.length === 0) { setSendMsg("❌ Ajoutez au moins un numéro dans Réglages."); return; }
-    if (unchecked.length === 0) { setSendMsg("La liste est vide (ou tout est déjà coché)."); return; }
+    if (phones.length === 0) { setSendMsg("❌ " + tr("grocery.sendNoPhone")); return; }
+    if (unchecked.length === 0) { setSendMsg(tr("grocery.sendEmpty")); return; }
     setSending(true); setSendMsg("");
     try {
-      const res = await fetch(`${cleanBackendUrl(settings.backendUrl)}/api/sms/send-list`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: unchecked, phones }),
-      });
-      const data = await res.json();
-      setSendMsg(data.success ? `✅ Liste envoyée à ${phones.length} numéro(s).` : "❌ Échec de l'envoi.");
-    } catch { setSendMsg("❌ Impossible de joindre le backend."); }
+      const lines = unchecked.map(i => `• ${i.name}${i.quantity ? ` (${i.quantity})` : ""}`);
+      const body = `🛒 ${tr("grocery.smsHeader")}\n${lines.join("\n")}`;
+      const { data, error } = await supabase.functions.invoke("notify", { body: { action: "broadcast", familyId, body } });
+      if (error || !data?.success || !data.sent) setSendMsg("❌ " + tr("grocery.sendFail"));
+      else setSendMsg(`✅ ${tr("grocery.sendOk")} ${data.sent}`);
+    } catch { setSendMsg("❌ " + tr("grocery.sendFail")); }
     setSending(false);
   };
 
@@ -2379,6 +2377,27 @@ function RewardChartModal({ members, chart, onClose, onSave }) {
   );
 }
 
+// Groupe repliable pour garder l'écran des Réglages court : on ouvre seulement
+// la section dont on a besoin.
+function SettingsGroup({ title, hint, children: c, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{
+        width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
+        background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 10, padding: "14px 16px", cursor: "pointer", textAlign: "left",
+      }}>
+        <span>
+          <span style={{ display: "block", fontWeight: 700, fontSize: 15, color: COLORS.ink }}>{title}</span>
+          {hint && <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>{hint}</span>}
+        </span>
+        <ChevronRight size={18} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s", flexShrink: 0 }} />
+      </button>
+      {open && <div style={{ marginTop: 12 }}>{c}</div>}
+    </div>
+  );
+}
+
 function Card({ title, children: c }) {
   return (
     <div style={{ background: COLORS.card, borderRadius: 10, padding: 16, marginBottom: 14, boxShadow: "0 1px 3px rgba(0,0,0,0.07)" }}>
@@ -2998,50 +3017,52 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
     setPushBusy(false);
   };
 
-  const testBackend = async () => {
-    setTestResult("Test en cours…");
-    try {
-      const res = await fetch(`${cleanBackendUrl(form.backendUrl)}/api/test`);
-      const data = await res.json();
-      setTestResult(data.success ? "✅ Backend connecté avec succès!" : "❌ Réponse inattendue.");
-    } catch { setTestResult("❌ Impossible de joindre le backend. Vérifiez l'adresse."); }
-  };
+  // Recharge les données depuis Supabase (l'ancien "backend" n'existe plus).
   const forceSync = async () => {
     setSyncing(true); setSyncResult("");
-    try {
-      const res = await fetch(`${cleanBackendUrl(form.backendUrl)}/api/sync`);
-      if (!res.ok) { setSyncResult(`❌ Erreur (code ${res.status}). Réessayez dans une minute.`); }
-      else {
-        const json = await res.json();
-        if (json.success && json.data) { await onRefresh({ force: true }); setSyncResult(`✅ Connexion réussie. Le serveur a ${(json.data.groceryItems || []).length} article(s).`); }
-        else setSyncResult("⚠️ Le serveur a répondu, mais sans données encore sauvegardées.");
-      }
-    } catch { setSyncResult("❌ Aucune connexion au backend. Vérifiez internet ou l'adresse."); }
+    try { await onRefresh({ force: true }); setSyncResult(tr("settings.syncDone")); }
+    catch { setSyncResult(tr("settings.syncFailed")); }
     setSyncing(false);
-  };
-
-  const [reminderResult, setReminderResult] = useState("");
-  const runRemindersNow = async () => {
-    setReminderResult("Vérification en cours…");
-    try {
-      const res = await fetch(`${cleanBackendUrl(form.backendUrl)}/api/taches/relancer-maintenant`, { method: "POST" });
-      const data = await res.json();
-      setReminderResult(data.success ? "✅ Vérification exécutée — un texto a été envoyé à quiconque a une tâche en retard (max 1 par jour)." : "❌ Échec.");
-    } catch { setReminderResult("❌ Impossible de joindre le backend."); }
   };
 
   return (
     <div>
-      <Card title={tr("settings.syncBackend")}>
-        <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-          {tr("settings.syncBackendHelp")}
-        </p>
-        <label style={labelStyle}>{tr("settings.backendAddress")}</label>
-        <input style={inputStyle} value={form.backendUrl} onChange={e => setForm({ ...form, backendUrl: e.target.value })} placeholder="https://epicerie-repas-backend.onrender.com" />
-        <button type="button" onClick={testBackend} style={outlineBtn}>{tr("settings.testConnection")}</button>
-        {testResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{testResult}</p>}
+      <Card title={tr("settings.subscription")}>
+        {familyInfo?.subscriptionStatus === "active" ? (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
+              ✅ {tr("account.active")} ({familyInfo.plan === "annual" ? tr("plan.annual") : tr("plan.monthly")})
+            </p>
+            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={outlineBtn}>
+              {tr("account.manageSubscription")}
+            </button>
+          </>
+        ) : familyInfo?.subscriptionStatus === "past_due" ? (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.danger, marginTop: 0, marginBottom: 12 }}>
+              {tr("billing.paymentFailedLong")}
+            </p>
+            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={primaryBtn}>
+              {tr("billing.updatePayment")}
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
+              {familyInfo?.trialEndsAt && new Date(familyInfo.trialEndsAt) > new Date()
+                ? `${tr("account.trialEnds")} ${new Date(familyInfo.trialEndsAt).toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA")}`
+                : tr("billing.trialEnded")}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError, onRefresh)} style={primaryBtn}>{tr("billing.subscribeMonthly")}</button>
+              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError, onRefresh)} style={outlineBtn}>{tr("billing.subscribeAnnual")}</button>
+            </div>
+          </>
+        )}
+        {billingError && <p style={{ color: COLORS.danger, fontSize: 12.5, marginTop: 10 }}>{billingError}</p>}
       </Card>
 
+      <SettingsGroup title={tr("settings.groupAlerts")} hint={tr("settings.groupAlertsHint")}>
       <Card title={tr("settings.smsNumbers")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.smsHelp")}
@@ -3055,7 +3076,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         <label style={labelStyle}>{tr("settings.number")} 4</label>
         <input style={inputStyle} value={form.phone4 || ""} onChange={e => setForm({ ...form, phone4: e.target.value })} placeholder="+15145551234" />
       </Card>
-
       <Card title={tr("settings.taskAlertChannel")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.alertChannelHelp")}
@@ -3073,7 +3093,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           ))}
         </div>
       </Card>
-
       <Card title={tr("settings.deviceNotifications")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.deviceNotifHelp")}
@@ -3100,7 +3119,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           </>
         )}
       </Card>
-
       <Card title={tr("settings.parentDevice")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.parentDeviceHelp")}
@@ -3109,7 +3127,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           {pushBusy ? tr("settings.inProgress") : tr("settings.parentDeviceBtn")}
         </button>
       </Card>
-
       <Card title={tr("settings.classHours")}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
           <input type="checkbox" checked={form.schoolHoursEnabled !== false} onChange={e => setForm({ ...form, schoolHoursEnabled: e.target.checked })} />
@@ -3135,7 +3152,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           </div>
         )}
       </Card>
-
       <Card title={tr("settings.reminderSchedule")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.reminderHelp")}
@@ -3183,10 +3199,12 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           </div>
         </div>
       </Card>
-
       <button type="button" onClick={() => onSave({ ...form, backendUrl: cleanBackendUrl(form.backendUrl) })} style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px", marginBottom: 16 }}>
         <Check size={16} /> {tr("settings.saveSettings")}
       </button>
+      </SettingsGroup>
+
+      <SettingsGroup title={tr("settings.groupData")} hint={tr("settings.groupDataHint")}>
       <Card title={tr("settings.deviceSync")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
           {tr("settings.deviceHasItemsPrefix")} <strong>{itemsCount}</strong> {tr("settings.deviceHasItemsGrocery")} <strong>{mealsCount}</strong> {tr("settings.deviceHasItemsMeals")}
@@ -3205,42 +3223,6 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           {tr("settings.deviceSyncFootnote")}
         </p>
       </Card>
-
-      <Card title={tr("settings.subscription")}>
-        {familyInfo?.subscriptionStatus === "active" ? (
-          <>
-            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-              ✅ {tr("account.active")} ({familyInfo.plan === "annual" ? tr("plan.annual") : tr("plan.monthly")})
-            </p>
-            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={outlineBtn}>
-              {tr("account.manageSubscription")}
-            </button>
-          </>
-        ) : familyInfo?.subscriptionStatus === "past_due" ? (
-          <>
-            <p style={{ fontSize: 12.5, color: COLORS.danger, marginTop: 0, marginBottom: 12 }}>
-              {tr("billing.paymentFailedLong")}
-            </p>
-            <button type="button" disabled={billingBusy} onClick={() => openBillingPortal(setBillingBusy, setBillingError)} style={primaryBtn}>
-              {tr("billing.updatePayment")}
-            </button>
-          </>
-        ) : (
-          <>
-            <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
-              {familyInfo?.trialEndsAt && new Date(familyInfo.trialEndsAt) > new Date()
-                ? `${tr("account.trialEnds")} ${new Date(familyInfo.trialEndsAt).toLocaleDateString(lang === "en" ? "en-CA" : "fr-CA")}`
-                : tr("billing.trialEnded")}
-            </p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("monthly", setBillingBusy, setBillingError, onRefresh)} style={primaryBtn}>{tr("billing.subscribeMonthly")}</button>
-              <button type="button" disabled={billingBusy} onClick={() => startCheckout("annual", setBillingBusy, setBillingError, onRefresh)} style={outlineBtn}>{tr("billing.subscribeAnnual")}</button>
-            </div>
-          </>
-        )}
-        {billingError && <p style={{ color: COLORS.danger, fontSize: 12.5, marginTop: 10 }}>{billingError}</p>}
-      </Card>
-
       <Card title={tr("settings.localBackup")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>
           {tr("settings.backupHelp")}
@@ -3257,14 +3239,7 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
           {tr("settings.importFootnote")}
         </p>
       </Card>
-
-      <Card title={tr("settings.taskReminders")}>
-        <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
-          {tr("settings.taskReminderHelp")}
-        </p>
-        <button type="button" onClick={runRemindersNow} style={outlineBtn}>{tr("settings.checkRemindersNow")}</button>
-        {reminderResult && <p style={{ fontSize: 12.5, marginTop: 8, color: COLORS.ink }}>{reminderResult}</p>}
-      </Card>
+      </SettingsGroup>
     </div>
   );
 }
