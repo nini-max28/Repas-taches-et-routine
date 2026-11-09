@@ -2841,7 +2841,7 @@ function Sante({ onAddMember, members, vaccines, allergies, appointments, measur
       )}
 
       {showModal && section !== "documents" && (
-        <HealthEntryModal section={section} memberId={memberId} editingEntry={editingEntry} onClose={() => { setShowModal(false); setEditingEntry(null); }}
+        <HealthEntryModal section={section} memberId={memberId} members={members} editingEntry={editingEntry} onClose={() => { setShowModal(false); setEditingEntry(null); }}
           onAdd={adders[section]} onUpdate={updaters[section]} />
       )}
       {showModal && section === "documents" && (
@@ -2862,7 +2862,7 @@ function Sante({ onAddMember, members, vaccines, allergies, appointments, measur
   );
 }
 
-function HealthEntryModal({ section, memberId, editingEntry, onClose, onAdd, onUpdate }) {
+function HealthEntryModal({ section, memberId, members, editingEntry, onClose, onAdd, onUpdate }) {
   const { t: tr } = useLanguage();
   const e = editingEntry;
   const [name, setName] = useState(e ? (section === "allergies" ? e.allergen : section === "rdv" ? e.title : e.name || "") : "");
@@ -2881,6 +2881,9 @@ function HealthEntryModal({ section, memberId, editingEntry, onClose, onAdd, onU
   const [endDate, setEndDate] = useState(e?.endDate || "");
   const [active, setActive] = useState(e?.active ?? true);
   const [err, setErr] = useState("");
+  // Rendez-vous : on peut cocher plusieurs personnes (un rendez-vous est créé pour chacune).
+  const [whoIds, setWhoIds] = useState([memberId]);
+  const toggleWho = (id) => setWhoIds(prev => prev.includes(id) ? (prev.length > 1 ? prev.filter(x => x !== id) : prev) : [...prev, id]);
 
   const titles = {
     vaccins: e ? tr("health.editVaccine") : tr("health.addVaccine"),
@@ -2915,7 +2918,9 @@ function HealthEntryModal({ section, memberId, editingEntry, onClose, onAdd, onU
       if (cleanTimes.length === 0) { setErr(tr("health.medTimeRequired")); return; }
       payload = { memberId, name: name.trim(), dosage: dosage.trim(), times: cleanTimes, startDate, endDate: endDate || null, notes: notes.trim(), active };
     }
-    if (e) onUpdate(e.id, payload); else onAdd(payload);
+    if (e) onUpdate(e.id, payload);
+    else if (section === "rdv") whoIds.forEach(id => onAdd({ ...payload, memberId: id }));
+    else onAdd(payload);
     onClose();
   };
 
@@ -2925,6 +2930,27 @@ function HealthEntryModal({ section, memberId, editingEntry, onClose, onAdd, onU
         <>
           <label style={labelStyle}>{section === "allergies" ? tr("health.allergen") : section === "rdv" ? tr("health.appointmentTitle") : section === "medicaments" ? tr("health.medicationName") : tr("health.vaccineName")}</label>
           <input style={inputStyle} value={name} onChange={ev => setName(ev.target.value)} autoFocus />
+        </>
+      )}
+
+      {section === "rdv" && !e && members.length > 1 && (
+        <>
+          <label style={labelStyle}>{tr("health.appointmentFor")}</label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+            {members.map(m => {
+              const on = whoIds.includes(m.id);
+              return (
+                <button type="button" key={m.id} onClick={() => toggleWho(m.id)} style={{
+                  padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${m.color}`, cursor: "pointer", fontWeight: 600, fontSize: 12.5,
+                  background: on ? m.color : "transparent", color: on ? "#fff" : m.color,
+                }}>{on ? "✓ " : ""}{m.name}</button>
+              );
+            })}
+            <button type="button" onClick={() => setWhoIds(members.map(m => m.id))} style={{
+              padding: "6px 12px", borderRadius: 20, border: "1.5px dashed #B7AE91", background: "transparent", color: COLORS.muted, cursor: "pointer", fontWeight: 600, fontSize: 12.5,
+            }}>{tr("health.wholeFamily")}</button>
+          </div>
+          <p style={{ fontSize: 11.5, color: COLORS.muted, marginTop: 0, marginBottom: 12 }}>{tr("health.appointmentForHelp")}</p>
         </>
       )}
 
