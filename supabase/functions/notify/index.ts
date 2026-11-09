@@ -29,13 +29,23 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+// Twilio exige le format international (+15145551234). On accepte aussi les
+// numéros saisis à la nord-américaine : 514 555-1234, 5145551234, 15145551234.
+function normalizePhone(raw: string): string {
+  const text = String(raw || "").trim();
+  const digits = text.replace(/\D/g, "");
+  if (text.startsWith("+")) return "+" + digits;
+  if (digits.length === 10) return "+1" + digits;
+  return "+" + digits;
+}
+
 async function sendSms(to: string, body: string) {
   if (!TWILIO_SID || !TWILIO_TOKEN || !TWILIO_FROM) throw new Error("Twilio non configuré");
   const auth = btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`);
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ To: to, From: TWILIO_FROM, Body: body }),
+    body: new URLSearchParams({ To: normalizePhone(to), From: TWILIO_FROM, Body: body }),
   });
   if (!res.ok) throw new Error(await res.text());
 }
