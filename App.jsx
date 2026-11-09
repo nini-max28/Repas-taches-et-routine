@@ -7,6 +7,7 @@ import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
 import { isNativeApp, initRevenueCat, getOfferings, purchasePackage, restorePurchases, hasActiveEntitlement } from "./revenuecat";
 import { useLanguage } from "./i18n.jsx";
+import { withDetails, detailsForTitle } from "./recipeDetails.js";
 import {
   ShoppingCart, ChefHat, CalendarDays, Settings, Plus, X, Check, Trash2, Pencil,
   RefreshCw, AlertCircle, Dice5, ChevronLeft, ChevronRight, Sparkles, ListTodo, UserPlus, Send, Bell,
@@ -811,7 +812,7 @@ function App({ session }) {
       // Première ouverture pour cette famille : on amorce avec les idées de
       // repas suggérées, une seule fois — dans la langue de l'appareil au
       // moment de la création du compte.
-      const seedSource = lang === "en" ? SEED_MEALS_EN : SEED_MEALS;
+      const seedSource = withDetails(lang === "en" ? SEED_MEALS_EN : SEED_MEALS, lang === "en" ? "en" : "fr");
       const seeded = seedSource.map(m => ({ id: uid(), ...m }));
       for (const meal of seeded) await insertRow("meal_ideas", famId, meal);
       mi = seeded;
@@ -1214,28 +1215,37 @@ function App({ session }) {
   const addMeal = (m) => persistMeals([...mealIdeas, { id: uid(), ...m }]);
   const addMarinades = () => {
     const existingTitles = new Set(mealIdeas.map(m => m.title.toLowerCase()));
-    const toAdd = MARINADE_RECIPES.filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
+    const toAdd = withDetails(MARINADE_RECIPES, "fr").filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
     if (toAdd.length) persistMeals([...mealIdeas, ...toAdd]);
   };
   const addSnacks = () => {
     const existingTitles = new Set(mealIdeas.map(m => m.title.toLowerCase()));
-    const toAdd = SNACK_RECIPES.filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
+    const toAdd = withDetails(SNACK_RECIPES, "fr").filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
     if (toAdd.length) persistMeals([...mealIdeas, ...toAdd]);
   };
   const addPickyLunches = () => {
     const existingTitles = new Set(mealIdeas.map(m => m.title.toLowerCase()));
-    const toAdd = PICKY_LUNCH_RECIPES.filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
+    const toAdd = withDetails(PICKY_LUNCH_RECIPES, "fr").filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
     if (toAdd.length) persistMeals([...mealIdeas, ...toAdd]);
   };
   const addSideDishes = () => {
     const existingTitles = new Set(mealIdeas.map(m => m.title.toLowerCase()));
-    const toAdd = SIDE_DISH_RECIPES.filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
+    const toAdd = withDetails(SIDE_DISH_RECIPES, "fr").filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
     if (toAdd.length) persistMeals([...mealIdeas, ...toAdd]);
   };
   const addMoreMarinades = () => {
     const existingTitles = new Set(mealIdeas.map(m => m.title.toLowerCase()));
-    const toAdd = CHICKEN_BEEF_MARINADES.filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
+    const toAdd = withDetails(CHICKEN_BEEF_MARINADES, "fr").filter(r => !existingTitles.has(r.title.toLowerCase())).map(r => ({ id: uid(), ...r }));
     if (toAdd.length) persistMeals([...mealIdeas, ...toAdd]);
+  };
+  // Remplace les étapes et la note des recettes suggérées déjà présentes (même titre) par la
+  // version détaillée. Les recettes ajoutées par la famille, avec un autre titre, ne bougent pas.
+  const hasNewerDetails = (m) => { const d = detailsForTitle(m.title); return !!d && JSON.stringify(m.steps || []) !== JSON.stringify(d.steps); };
+  const updateSuggestedRecipes = () => {
+    const count = mealIdeas.filter(hasNewerDetails).length;
+    if (count === 0) return;
+    if (!window.confirm(tr("meals.updateConfirm").replace("{n}", String(count)))) return;
+    persistMeals(mealIdeas.map(m => hasNewerDetails(m) ? { ...m, notes: detailsForTitle(m.title).notes, steps: detailsForTitle(m.title).steps } : m));
   };
   const updateMeal = (id, patch) => persistMeals(mealIdeas.map(m => m.id === id ? { ...m, ...patch } : m));
   const deleteMeal = (id) => persistMeals(mealIdeas.filter(m => m.id !== id));
@@ -1435,7 +1445,7 @@ function App({ session }) {
             onDelete={deleteGroceryItem} onClearChecked={clearChecked} onReset={resetGroceryList} />
         )}
         {tab === "idees" && (
-          <Idees meals={mealIdeas} onAdd={() => setShowAddMeal(true)} onAddMarinades={addMarinades} onAddSnacks={addSnacks} onAddPickyLunches={addPickyLunches} onAddSideDishes={addSideDishes} onAddMoreMarinades={addMoreMarinades} onEdit={setEditingMeal} onDelete={deleteMeal} />
+          <Idees meals={mealIdeas} onAdd={() => setShowAddMeal(true)} onAddMarinades={addMarinades} onAddSnacks={addSnacks} onAddPickyLunches={addPickyLunches} onAddSideDishes={addSideDishes} onAddMoreMarinades={addMoreMarinades} onUpdateSuggested={updateSuggestedRecipes} onEdit={setEditingMeal} onDelete={deleteMeal} />
         )}
         {tab === "taches" && (
           <Taches members={members} tasks={tasks} onAddMember={() => setShowAddMember(true)} onDeleteMember={deleteMember}
@@ -1821,7 +1831,7 @@ function Epicerie({ items, settings, familyId, onAdd, onToggle, onDelete, onClea
   );
 }
 
-function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, onAddSideDishes, onAddMoreMarinades, onEdit, onDelete }) {
+function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, onAddSideDishes, onAddMoreMarinades, onUpdateSuggested, onEdit, onDelete }) {
   const { t: tr } = useLanguage();
   const [catFilter, setCatFilter] = useState("tous");
   const [tagFilter, setTagFilter] = useState("tous");
@@ -1833,10 +1843,12 @@ function Idees({ meals, onAdd, onAddMarinades, onAddSnacks, onAddPickyLunches, o
   const hasSideDishes = meals.some(m => m.category === "accompagnement");
   const existingTitlesLower = useMemo(() => new Set(meals.map(m => m.title.toLowerCase())), [meals]);
   const hasMoreMarinades = CHICKEN_BEEF_MARINADES.every(r => existingTitlesLower.has(r.title.toLowerCase()));
+  const updatableCount = useMemo(() => meals.filter(m => { const d = detailsForTitle(m.title); return !!d && JSON.stringify(m.steps || []) !== JSON.stringify(d.steps); }).length, [meals]);
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        {updatableCount > 0 && <button onClick={onUpdateSuggested} style={outlineBtn}><ChefHat size={16} /> {tr("meals.updateSuggested")} ({updatableCount})</button>}
         {!hasMarinades && <button onClick={onAddMarinades} style={outlineBtn}><Plus size={16} /> {tr("meals.addMarinades")}</button>}
         {hasMarinades && !hasMoreMarinades && <button onClick={onAddMoreMarinades} style={outlineBtn}><Plus size={16} /> {tr("meals.moreMarinades")}</button>}
         {!hasSnacks && <button onClick={onAddSnacks} style={outlineBtn}><Plus size={16} /> {tr("meals.addSnacks")}</button>}
