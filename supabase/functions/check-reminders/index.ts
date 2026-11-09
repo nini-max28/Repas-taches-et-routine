@@ -31,6 +31,17 @@ function localParts(tz: string) {
   };
 }
 
+function addDaysStr(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+// "14:30" -> "14 h 30", "09:00" -> "9 h"
+function formatTimeFr(t: string): string {
+  const [h, m] = t.split(":");
+  return m && m !== "00" ? `${Number(h)} h ${m}` : `${Number(h)} h`;
+}
+
 const ROUTINE_TITLES = ["🎈 C'est l'heure!", "🌟 On y va!", "✨ Prêt(e)?"];
 const ROUTINE_BODIES = (name: string, task: string) => [
   `${name}, c'est l'heure de "${task}"!`,
@@ -95,6 +106,38 @@ Deno.serve(async () => {
         body: `💊 C'est l'heure du médicament de ${childName} : ${med.name}${med.dosage ? ` (${med.dosage})` : ""}.`,
       });
       notified++;
+    }
+
+    // --- Rendez-vous : un rappel la veille, à partir de l'heure "après-midi" des réglages
+    // (16 h par défaut), à la personne concernée ET aux parents. Une seule fois par
+    // rendez-vous : on "réserve" le rendez-vous (reminder_sent_at) avant d'envoyer. ---
+    {
+      const { data: apptSettings } = await admin.from("settings").select("afternoon_reminder_hour").eq("family_id", family.id).maybeSingle();
+      const apptHour = apptSettings?.afternoon_reminder_hour ?? 16;
+      if (hour >= apptHour) {
+        const tomorrow = addDaysStr(dateStr, 1);
+        const { data: appts } = await admin.from("health_appointments").select("*")
+          .eq("family_id", family.id).eq("appointment_date", tomorrow).is("reminder_sent_at", null);
+        for (const appt of appts || []) {
+          const { data: claimed } = await admin.from("health_appointments")
+            .update({ reminder_sent_at: new Date().toISOString() })
+            .eq("id", appt.id).is("reminder_sent_at", null).select("id");
+          if (!claimed || claimed.length === 0) continue;
+          const { data: member } = await admin.from("members").select("*").eq("id", appt.member_id).maybeSingle();
+          if (!member) continue;
+          const when = appt.appointment_time ? ` à ${formatTimeFr(appt.appointment_time)}` : "";
+          const where = appt.location ? ` (${appt.location})` : "";
+          await callNotify({
+            action: "send",
+            familyId: family.id,
+            memberId: member.id,
+            title: "🩺 Rendez-vous demain",
+            body: `${member.name} : ${appt.title} demain${when}${where}.`,
+            notifyParent: true,
+          });
+          notified++;
+        }
+      }
     }
 
     // --- Tâches simples et en alternance : créneaux matin/après-midi/soir ---
