@@ -1048,6 +1048,8 @@ function App({ session }) {
   const addMember = (name, phone, kidMode, limitedMode) => persistMembers([...members, { id: uid(), name, phone: phone || "", kidMode: !!kidMode, limitedMode: !!limitedMode && !kidMode, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length] }]);
   const updateMember = (id, patch) => persistMembers(members.map(m => m.id === id ? { ...m, ...patch } : m));
   const deleteMember = (id) => {
+    const person = members.find(m => m.id === id);
+    if (!window.confirm(tr("member.deleteConfirm").replace("{name}", person ? person.name : ""))) return;
     persistMembers(members.filter(m => m.id !== id));
     persistTasks(tasks.map(t => t.assignedTo === id ? { ...t, assignedTo: null } : t));
   };
@@ -1444,7 +1446,7 @@ function App({ session }) {
             onDeleteReward={deleteRewardChart} onMarkNight={markRewardNight} onUndoNight={undoRewardNight} onSetReward={setRewardChoice} />
         )}
         {tab === "sante" && !isKidDevice && (
-          <Sante members={members} vaccines={vaccines} allergies={allergies} appointments={appointments} measurements={measurements}
+          <Sante onAddMember={() => setShowAddMember(true)} members={members} vaccines={vaccines} allergies={allergies} appointments={appointments} measurements={measurements}
             documents={documents} medications={medications}
             onAddVaccine={addVaccine} onUpdateVaccine={updateVaccine} onDeleteVaccine={deleteVaccine}
             onAddAllergy={addAllergy} onUpdateAllergy={updateAllergy} onDeleteAllergy={deleteAllergy}
@@ -1457,7 +1459,7 @@ function App({ session }) {
           <Budget transactions={budgetTx} onAdd={addBudgetTx} onUpdate={updateBudgetTx} onDelete={deleteBudgetTx} />
         )}
         {tab === "params" && !isLimitedLocked && (
-          <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} familyInfo={familyInfo} />
+          <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} onAddMember={() => setShowAddMember(true)} onEditMember={setEditingMember} onDeleteMember={deleteMember} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} familyInfo={familyInfo} />
         )}
       </main>
 
@@ -2633,7 +2635,7 @@ function GrowthChart({ measurements, lang }) {
   );
 }
 
-function Sante({ members, vaccines, allergies, appointments, measurements, documents, medications,
+function Sante({ onAddMember, members, vaccines, allergies, appointments, measurements, documents, medications,
   onAddVaccine, onUpdateVaccine, onDeleteVaccine, onAddAllergy, onUpdateAllergy, onDeleteAllergy,
   onAddAppointment, onUpdateAppointment, onDeleteAppointment, onAddMeasurement, onUpdateMeasurement, onDeleteMeasurement,
   onAddDocument, onDeleteDocument, onAddMedication, onUpdateMedication, onDeleteMedication }) {
@@ -2652,7 +2654,7 @@ function Sante({ members, vaccines, allergies, appointments, measurements, docum
     return (
       <div>
         <h2 style={sectionTitleStyle}>{tr("nav.health")}</h2>
-        <EmptyState text={tr("health.addMembersFirst")} />
+        <EmptyState text={tr("health.addMembersFirst")} cta={tr("member.add")} onClick={onAddMember} />
       </div>
     );
   }
@@ -2694,6 +2696,10 @@ function Sante({ members, vaccines, allergies, appointments, measurements, docum
             fontWeight: 600, fontSize: 12.5, cursor: "pointer",
           }}>{m.name}</button>
         ))}
+        <button onClick={onAddMember} style={{
+          padding: "6px 12px", borderRadius: 20, border: "1.5px dashed #B7AE91", background: "transparent",
+          color: COLORS.muted, fontWeight: 600, fontSize: 12.5, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
+        }}><UserPlus size={12} /> {tr("member.addPerson")}</button>
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
@@ -3134,7 +3140,7 @@ function BudgetTxModal({ editingTx, onClose, onAdd, onUpdate }) {
 }
 
 
-function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, myMemberId, setMyMemberId, onExport, onImport, session, familyInfo }) {
+function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCount, members, onAddMember, onEditMember, onDeleteMember, myMemberId, setMyMemberId, onExport, onImport, session, familyInfo }) {
   const { t: tr, lang, setLang } = useLanguage();
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState("");
@@ -3223,6 +3229,22 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
 
   return (
     <div>
+      <Card title={tr("settings.members")}>
+        <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0 }}>{tr("settings.membersHelp")}</p>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
+          {members.map(m => (
+            <span key={m.id} style={{
+              padding: "6px 12px", borderRadius: 20, border: `1.5px solid ${m.color}`, color: m.color,
+              fontWeight: 600, fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 6,
+            }}>{m.name}
+              <span onClick={() => onEditMember(m)} style={{ opacity: 0.7, display: "flex", cursor: "pointer" }}><Pencil size={11} /></span>
+              <span onClick={() => onDeleteMember(m.id)} style={{ opacity: 0.7, display: "flex", cursor: "pointer" }}><X size={11} /></span>
+            </span>
+          ))}
+        </div>
+        <button type="button" onClick={onAddMember} style={outlineBtn}><UserPlus size={14} /> {tr("member.add")}</button>
+      </Card>
+
       <Card title={tr("settings.subscription")}>
         {familyInfo?.subscriptionStatus === "active" ? (
           <>
