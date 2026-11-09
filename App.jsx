@@ -1421,6 +1421,7 @@ function App({ session }) {
         )}
         {tab === "semaine" && (
           <Semaine weekDates={weekDates} weekPlan={weekPlan} mealById={mealById}
+            appointments={isKidDevice ? [] : appointments} tasks={tasks} members={members}
             onPrevWeek={() => setWeekStart(addDays(weekStart, -7))}
             onNextWeek={() => setWeekStart(addDays(weekStart, 7))}
             onToday={() => setWeekStart(startOfWeek(todayStr()))}
@@ -1524,12 +1525,158 @@ function PinCard({ children: c }) {
     </div>
   );
 }
-function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToday, onPick, onClear, onAddIngredients }) {
-  const { t: tr } = useLanguage();
-  const planFor = (date) => weekPlan.find(p => p.date === date);
+// ---------- Semaine / Mois : repas + rendez-vous + tâches à prévoir ----------
+function ymdLocal(y, m, d) { return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`; }
+
+function nextWeekdayOnOrAfter(dateStr, dow) {
+  const d = new Date(dateStr + "T00:00:00");
+  return addDays(dateStr, (dow - d.getDay() + 7) % 7);
+}
+
+// Ce qu'il y a à prévoir un jour donné : rendez-vous de santé, et tâches qui ont
+// une date précise ou un jour fixe (les tâches quotidiennes, en alternance ou
+// "à la demande" ne sont pas affichées : elles encombreraient le calendrier).
+function eventsForDate(date, appointments, tasks, members) {
+  const nameOf = (id) => (members.find(m => m.id === id) || {}).name || "";
+  const appts = (appointments || []).filter(a => a.appointmentDate === date)
+    .sort((x, y) => (x.appointmentTime || "").localeCompare(y.appointmentTime || ""))
+    .map(a => ({ id: a.id, text: `${a.appointmentTime ? a.appointmentTime + " " : ""}${a.title}`, sub: nameOf(a.memberId) }));
+  const dow = new Date(date + "T00:00:00").getDay();
+  const today = todayStr();
+  const dayTasks = [];
+  for (const t of tasks || []) {
+    if (t.type !== "chore" || t.onDemand) continue;
+    const hasDow = t.dueDayOfWeek !== null && t.dueDayOfWeek !== undefined && t.dueDayOfWeek !== "";
+    let show = false, done = false;
+    if (t.frequency === "unique") { show = !!t.dueDate && t.dueDate === date; done = !!t.lastDoneDate; }
+    else if (t.frequency === "hebdomadaire") { show = hasDow && Number(t.dueDayOfWeek) === dow; done = t.lastDoneDate === date; }
+    else if (t.frequency === "auxDeuxSemaines") {
+      if (t.lastDoneDate) show = date === addDays(t.lastDoneDate, 14);
+      else if (hasDow) show = date === nextWeekdayOnOrAfter(today, Number(t.dueDayOfWeek));
+    }
+    if (show) dayTasks.push({ id: t.id, text: t.title, sub: nameOf(t.assignedTo), done });
+  }
+  return { appts, tasks: dayTasks };
+}
+
+function EventChip({ icon, text, sub, done }) {
+  return (
+    <div style={{
+      fontSize: 11.5, lineHeight: 1.3, background: "#fff", border: "1px solid #E7E0CE", borderRadius: 8,
+      padding: "5px 7px", textDecoration: done ? "line-through" : "none", opacity: done ? 0.6 : 1,
+    }}>
+      <span>{icon}</span> {text}{sub ? <span style={{ color: COLORS.muted }}> · {sub}</span> : null}
+    </div>
+  );
+}
+
+const DOT = { meal: "#DD8468", appt: "#5B8DB8", task: "#7A9A5B" };
+
+function Semaine({ weekDates, weekPlan, mealById, appointments, tasks, members, onPrevWeek, onNextWeek, onToday, onPick, onClear, onAddIngredients }) {
+  const { t: tr, lang } = useLanguage();
+  const locale = lang === "en" ? "en-CA" : "fr-CA";
   const todayD = todayStr();
+  const [view, setView] = useState("week");
+  const [monthStart, setMonthStart] = useState(() => todayD.slice(0, 8) + "01");
+  const [selected, setSelected] = useState(todayD);
+
+  const planFor = (date) => weekPlan.find(p => p.date === date);
+  const mealInfo = (date) => {
+    const plan = planFor(date);
+    const meal = plan?.mealIdeaId ? mealById(plan.mealIdeaId) : null;
+    return { meal, title: meal?.title || plan?.customTitle || "" };
+  };
+  const eventsOf = (date) => eventsForDate(date, appointments, tasks, members);
+
+  const segBtn = (key, label) => (
+    <button type="button" onClick={() => setView(key)} style={{
+      flex: 1, padding: "8px 14px", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13,
+      background: view === key ? COLORS.accentDark : "#fff", color: view === key ? "#fff" : COLORS.ink,
+    }}>{label}</button>
+  );
+  const switcher = (
+    <div style={{ display: "flex", maxWidth: 260, margin: "0 auto 16px", border: "1.5px solid #D8D2BE", borderRadius: 10, overflow: "hidden" }}>
+      {segBtn("week", tr("week.viewWeek"))}
+      {segBtn("month", tr("week.viewMonth"))}
+    </div>
+  );
+
+  // ----- Vue Mois -----
+  if (view === "month") {
+    const first = new Date(monthStart + "T00:00:00");
+    const y = first.getFullYear(), m = first.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const lead = (first.getDay() + 6) % 7; // le lundi est la première colonne
+    const cells = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => ymdLocal(y, m, i + 1))];
+    const shiftMonth = (n) => { const d = new Date(y, m + n, 1); setMonthStart(ymdLocal(d.getFullYear(), d.getMonth(), 1)); };
+    const weekdayLabels = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(locale, { weekday: "short" }));
+    const goToday = () => { setMonthStart(todayD.slice(0, 8) + "01"); setSelected(todayD); };
+    const selInfo = mealInfo(selected);
+    const selEvents = eventsOf(selected);
+    const nothing = !selInfo.title && selEvents.appts.length === 0 && selEvents.tasks.length === 0;
+    return (
+      <div>
+        {switcher}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <button onClick={() => shiftMonth(-1)} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronLeft size={16} color={COLORS.accentDark} /></button>
+          <button onClick={goToday} className="hand" style={{ fontSize: 20, background: "none", border: "none", color: COLORS.ink, cursor: "pointer", textTransform: "capitalize" }}>
+            {first.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+          </button>
+          <button onClick={() => shiftMonth(1)} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronRight size={16} color={COLORS.accentDark} /></button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {weekdayLabels.map((w, i) => (
+            <div key={i} className="mono" style={{ fontSize: 10, textAlign: "center", color: COLORS.muted, textTransform: "uppercase", padding: "2px 0" }}>{w}</div>
+          ))}
+          {cells.map((date, i) => {
+            if (!date) return <div key={"e" + i} />;
+            const ev = eventsOf(date);
+            const hasMeal = !!mealInfo(date).title;
+            const isToday = date === todayD;
+            const isSel = date === selected;
+            return (
+              <button key={date} onClick={() => setSelected(date)} style={{
+                minHeight: 52, padding: "4px 2px", borderRadius: 8, cursor: "pointer",
+                border: isToday ? `2px solid ${COLORS.accent}` : "1.5px solid #E7E0CE",
+                background: isSel ? "#F0EAD8" : COLORS.card, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              }}>
+                <span style={{ fontSize: 13, fontWeight: isToday ? 800 : 600, color: COLORS.ink }}>{Number(date.slice(8))}</span>
+                <span style={{ display: "flex", gap: 3 }}>
+                  {hasMeal && <span style={{ width: 6, height: 6, borderRadius: 3, background: DOT.meal }} />}
+                  {ev.appts.length > 0 && <span style={{ width: 6, height: 6, borderRadius: 3, background: DOT.appt }} />}
+                  {ev.tasks.length > 0 && <span style={{ width: 6, height: 6, borderRadius: 3, background: DOT.task }} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", fontSize: 11.5, color: COLORS.muted, margin: "10px 0 14px", flexWrap: "wrap" }}>
+          <span><span style={{ color: DOT.meal }}>●</span> {tr("nav.meals")}</span>
+          <span><span style={{ color: DOT.appt }}>●</span> {tr("health.appointments")}</span>
+          <span><span style={{ color: DOT.task }}>●</span> {tr("nav.tasks")}</span>
+        </div>
+        <div style={{ background: COLORS.card, border: "1.5px solid #E7E0CE", borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, textTransform: "capitalize" }}>
+            {new Date(selected + "T00:00:00").toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {selInfo.title && <EventChip icon="🍽" text={selInfo.title} />}
+            {selEvents.appts.map(e => <EventChip key={e.id} icon="🩺" text={e.text} sub={e.sub} />)}
+            {selEvents.tasks.map(e => <EventChip key={e.id} icon="✅" text={e.text} sub={e.sub} done={e.done} />)}
+            {nothing && <div style={{ fontSize: 12.5, color: COLORS.muted, fontStyle: "italic" }}>{tr("week.nothing")}</div>}
+          </div>
+          <button onClick={() => onPick(selected)} style={{ ...outlineBtn, padding: "7px 10px", fontSize: 12, marginTop: 12 }}>
+            {selInfo.title ? <Pencil size={12} /> : <Plus size={12} />} {selInfo.title ? tr("week.change") : tr("week.choose")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Vue Semaine -----
   return (
     <div>
+      {switcher}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <button onClick={onPrevWeek} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronLeft size={16} color={COLORS.accentDark} /></button>
         <button onClick={onToday} className="hand" style={{ fontSize: 20, background: "none", border: "none", color: COLORS.ink, cursor: "pointer" }}>
@@ -1539,9 +1686,8 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingBottom: 8 }}>
         {weekDates.map(date => {
-          const plan = planFor(date);
-          const meal = plan?.mealIdeaId ? mealById(plan.mealIdeaId) : null;
-          const title = meal?.title || plan?.customTitle;
+          const { meal, title } = mealInfo(date);
+          const ev = eventsOf(date);
           const isToday = date === todayD;
           const [dow, dayNum] = fmtDayLabel(date).split(" ");
           return (
@@ -1568,8 +1714,10 @@ function Semaine({ weekDates, weekPlan, mealById, onPrevWeek, onNextWeek, onToda
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic", flex: 1 }}>{tr("week.noMeal")}</div>
+                  <div style={{ fontSize: 12, color: COLORS.muted, fontStyle: "italic" }}>{tr("week.noMeal")}</div>
                 )}
+                {ev.appts.map(e => <EventChip key={e.id} icon="🩺" text={e.text} sub={e.sub} />)}
+                {ev.tasks.map(e => <EventChip key={e.id} icon="✅" text={e.text} sub={e.sub} done={e.done} />)}
                 <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                   <button onClick={() => onPick(date)} style={{ ...outlineBtn, padding: "6px 8px", fontSize: 11, justifyContent: "center" }}>
                     {title ? <Pencil size={11} /> : <Plus size={11} />} {title ? tr("week.change") : tr("week.choose")}
