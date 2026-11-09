@@ -3285,6 +3285,29 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         <button type="button" onClick={onAddMember} style={outlineBtn}><UserPlus size={14} /> {tr("member.add")}</button>
       </Card>
 
+      <Card title={tr("settings.thisDevice")}>
+        <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0 }}>{tr("settings.thisDeviceHelp")}</p>
+        {members.length === 0 ? (
+          <p style={{ fontSize: 12.5, color: COLORS.muted }}>{tr("settings.addMembersFirst3")}</p>
+        ) : (
+          <>
+            <select style={inputStyle} value={myMemberId} onChange={e => setMyMemberId(e.target.value)}>
+              <option value="">{tr("settings.noOneSpecific")}</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <p style={{ fontSize: 12.5, fontWeight: 600, marginTop: 4, marginBottom: 0 }}>
+              {(() => {
+                const me = members.find(m => m.id === myMemberId);
+                if (!me) return tr("settings.deviceModeNone");
+                if (me.kidMode) return "🔒 " + tr("settings.deviceModeRestricted");
+                if (me.limitedMode) return "🔒 " + tr("settings.deviceModeLimited");
+                return tr("settings.deviceModeFull");
+              })()}
+            </p>
+          </>
+        )}
+      </Card>
+
       <Card title={tr("settings.subscription")}>
         {familyInfo?.subscriptionStatus === "active" ? (
           <>
