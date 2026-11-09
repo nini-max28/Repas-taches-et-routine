@@ -42,6 +42,11 @@ function addDaysStr(dateStr: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+// ["Léa"] -> "Léa", ["Léa", "Noé"] -> "Léa et Noé", ["Léa", "Noé", "Zoé"] -> "Léa, Noé et Zoé"
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+}
 // "14:30" -> "14 h 30", "09:00" -> "9 h"
 function formatTimeFr(t: string): string {
   const [h, m] = t.split(":");
@@ -225,28 +230,68 @@ export async function run(db: any, now: Date = new Date()) {
   }
 
   // Rendez-vous : un rappel la veille, à partir de l'heure "après-midi" des réglages
-  // (16 h par défaut), à la personne concernée ET aux parents. Une seule fois par
-  // rendez-vous : on "réserve" le rendez-vous (reminder_sent_at) avant d'envoyer.
+  // (16 h par défaut). Une seule fois par rendez-vous : on "réserve" le rendez-vous
+  // (reminder_sent_at) avant d'envoyer.
+  //  - Un rendez-vous pour une personne : rappel à cette personne ET aux parents.
+  //  - Le même rendez-vous pour plusieurs personnes (même titre, jour, heure et lieu) :
+  //    chaque personne reçoit son rappel, et les parents un SEUL message pour tout le monde.
+  const apptGroups = new Map<string, Row[]>();
   for (const appt of dueAppts) {
-    jobs.push(async () => {
-      const { data: claimed } = await db.from("health_appointments")
-        .update({ reminder_sent_at: new Date().toISOString() })
-        .eq("id", appt.id).is("reminder_sent_at", null).select("id");
-      if (!claimed || claimed.length === 0) return;
-      const member = memberById.get(appt.member_id);
-      if (!member) return;
-      const when = appt.appointment_time ? ` à ${formatTimeFr(appt.appointment_time)}` : "";
-      const where = appt.location ? ` (${appt.location})` : "";
-      await callNotify({
-        action: "send",
-        familyId: appt.family_id,
-        memberId: member.id,
-        title: "🩺 Rendez-vous demain",
-        body: `${member.name} : ${appt.title} demain${when}${where}.`,
-        notifyParent: true,
+    const key = [appt.family_id, appt.appointment_date, appt.appointment_time || "",
+      String(appt.title || "").trim().toLowerCase(), String(appt.location || "").trim().toLowerCase()].join("|");
+    const list = apptGroups.get(key);
+    if (list) list.push(appt); else apptGroups.set(key, [appt]);
+  }
+  for (const group of apptGroups.values()) {
+    if (group.length === 1) {
+      const appt = group[0];
+      jobs.push(async () => {
+        const { data: claimed } = await db.from("health_appointments")
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .eq("id", appt.id).is("reminder_sent_at", null).select("id");
+        if (!claimed || claimed.length === 0) return;
+        const member = memberById.get(appt.member_id);
+        if (!member) return;
+        const when = appt.appointment_time ? ` à ${formatTimeFr(appt.appointment_time)}` : "";
+        const where = appt.location ? ` (${appt.location})` : "";
+        await callNotify({
+          action: "send",
+          familyId: appt.family_id,
+          memberId: member.id,
+          title: "🩺 Rendez-vous demain",
+          body: `${member.name} : ${appt.title} demain${when}${where}.`,
+          notifyParent: true,
+        });
+        notified++;
       });
-      notified++;
-    });
+    } else {
+      jobs.push(async () => {
+        const mine: Row[] = [];
+        for (const appt of group) {
+          const { data: claimed } = await db.from("health_appointments")
+            .update({ reminder_sent_at: new Date().toISOString() })
+            .eq("id", appt.id).is("reminder_sent_at", null).select("id");
+          if (claimed && claimed.length > 0) mine.push(appt);
+        }
+        const people: Row[] = [];
+        for (const appt of mine) {
+          const m = memberById.get(appt.member_id);
+          if (m && !people.some((p) => p.id === m.id)) people.push(m);
+        }
+        if (people.length === 0) return;
+        people.sort((a, b) => String(a.name).localeCompare(String(b.name), "fr")); // ordre stable : alphabétique
+        const first = mine[0];
+        const when = first.appointment_time ? ` à ${formatTimeFr(first.appointment_time)}` : "";
+        const where = String(first.location || "").trim() ? ` (${String(first.location).trim()})` : "";
+        const names = joinNames(people.map((p) => p.name));
+        const body = `${names} : ${String(first.title).trim()} demain${when}${where}.`;
+        for (const p of people) {
+          await callNotify({ action: "send", familyId: first.family_id, memberId: p.id, title: "🩺 Rendez-vous demain", body, notifyParent: false });
+        }
+        await callNotify({ action: "broadcast", familyId: first.family_id, body: `🩺 ${body}` });
+        notified++;
+      });
+    }
   }
 
   // Routines visuelles avec une heure de rappel précise.
