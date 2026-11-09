@@ -770,6 +770,7 @@ function App({ session }) {
   const [editingReward, setEditingReward] = useState(null);
   const [saveErr, setSaveErr] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const tapCountRef = useRef({ count: 0, last: 0 });
   const lastLocalWriteRef = useRef(0);
   // Empêche le rafraîchissement automatique (minuterie ou retour de focus, ex.
@@ -1044,7 +1045,7 @@ function App({ session }) {
   };
 
 
-  const addMember = (name, phone, kidMode) => persistMembers([...members, { id: uid(), name, phone: phone || "", kidMode: !!kidMode, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length] }]);
+  const addMember = (name, phone, kidMode, limitedMode) => persistMembers([...members, { id: uid(), name, phone: phone || "", kidMode: !!kidMode, limitedMode: !!limitedMode && !kidMode, color: MEMBER_COLORS[members.length % MEMBER_COLORS.length] }]);
   const updateMember = (id, patch) => persistMembers(members.map(m => m.id === id ? { ...m, ...patch } : m));
   const deleteMember = (id) => {
     persistMembers(members.filter(m => m.id !== id));
@@ -1267,17 +1268,31 @@ function App({ session }) {
   // cachés du menu. Toucher le titre 5 fois de suite les fait réapparaître pour vous.
   const myMember = members.find(m => m.id === myMemberId);
   const isKidLocked = !!(myMember && myMember.kidMode) && !unlocked;
+  // Appareil d'enfant (accès restreint), MÊME après le déverrouillage en touchant
+  // le titre : le Budget et la Santé (dossiers médicaux de toute la famille)
+  // restent toujours cachés ici. Les parents les consultent depuis leur appareil.
+  // "Accès limité" (les plus grands) : pas de Santé ni de Budget, et, tant que l'appareil
+  // n'est pas déverrouillé, ni Réglages ni menu du compte. Le niveau "restreint" (les
+  // petits) est plus strict et l'emporte s'il est coché aussi.
+  const isLimitedLocked = !!(myMember && myMember.limitedMode && !myMember.kidMode) && !unlocked;
+  const isKidDevice = !!(myMember && (myMember.kidMode || myMember.limitedMode));
   useEffect(() => {
     if (loaded && myMember?.kidMode && !unlocked) setTab("moi");
+    else if (isKidDevice && (tab === "budget" || tab === "sante")) setTab("semaine");
+    else if (isLimitedLocked && tab === "params") setTab("semaine");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, myMemberId]);
+  }, [loaded, myMemberId, tab, unlocked]);
 
   const handleTitleTap = () => {
     const now = Date.now();
     const ref = tapCountRef.current;
     ref.count = (now - ref.last < 600) ? ref.count + 1 : 1;
     ref.last = now;
-    if (ref.count >= 5) { setUnlocked(true); ref.count = 0; }
+    if (ref.count >= 5) {
+      ref.count = 0;
+      // Si un code parent est défini sur cet appareil, on le demande ; sinon, comme avant.
+      if (lsGet("parentPin", "")) setShowPin(true); else setUnlocked(true);
+    }
   };
 
   const [slowLoad, setSlowLoad] = useState(false);
@@ -1339,7 +1354,7 @@ function App({ session }) {
               Planifamille
             </h1>
           </div>
-          {!isKidLocked && (
+          {!isKidLocked && !isLimitedLocked && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 type="button"
@@ -1359,6 +1374,8 @@ function App({ session }) {
         </div>
       </header>
 
+      {showPin && <PinPrompt onClose={() => setShowPin(false)} onSuccess={() => { setShowPin(false); setUnlocked(true); }} />}
+
       <nav style={{ maxWidth: 760, margin: "0 auto", padding: "0 18px" }}>
         <div style={{ display: "flex", gap: 4, borderBottom: "3px solid #D8D2BE", overflowX: "auto" }}>
           {(isKidLocked ? [{ id: "moi", label: myMember?.name || "Moi", icon: Sparkles }] : [
@@ -1367,9 +1384,11 @@ function App({ session }) {
             { id: "epicerie", label: tr("nav.grocery"), icon: ShoppingCart },
             { id: "idees", label: tr("nav.meals"), icon: ChefHat },
             { id: "taches", label: tr("nav.tasks"), icon: ListTodo },
-            { id: "sante", label: tr("nav.health"), icon: HeartPulse },
-            { id: "budget", label: tr("nav.budget"), icon: Wallet },
-            { id: "params", label: tr("nav.settings"), icon: Settings },
+            ...(isKidDevice ? [] : [
+              { id: "sante", label: tr("nav.health"), icon: HeartPulse },
+              { id: "budget", label: tr("nav.budget"), icon: Wallet },
+            ]),
+            ...(isLimitedLocked ? [] : [{ id: "params", label: tr("nav.settings"), icon: Settings }]),
           ]).map(t => {
             const Icon = t.icon;
             const active = tab === t.id;
@@ -1423,7 +1442,7 @@ function App({ session }) {
             rewardCharts={rewardCharts} onAddReward={() => setShowAddReward(true)} onEditReward={setEditingReward}
             onDeleteReward={deleteRewardChart} onMarkNight={markRewardNight} onUndoNight={undoRewardNight} onSetReward={setRewardChoice} />
         )}
-        {tab === "sante" && (
+        {tab === "sante" && !isKidDevice && (
           <Sante members={members} vaccines={vaccines} allergies={allergies} appointments={appointments} measurements={measurements}
             documents={documents} medications={medications}
             onAddVaccine={addVaccine} onUpdateVaccine={updateVaccine} onDeleteVaccine={deleteVaccine}
@@ -1433,10 +1452,10 @@ function App({ session }) {
             onAddDocument={addDocument} onDeleteDocument={deleteDocument}
             onAddMedication={addMedication} onUpdateMedication={updateMedication} onDeleteMedication={deleteMedication} />
         )}
-        {tab === "budget" && (
+        {tab === "budget" && !isKidDevice && (
           <Budget transactions={budgetTx} onAdd={addBudgetTx} onUpdate={updateBudgetTx} onDelete={deleteBudgetTx} />
         )}
-        {tab === "params" && (
+        {tab === "params" && !isLimitedLocked && (
           <Params settings={settings} onSave={persistSettings} onRefresh={loadAll} onForcePush={forcePushAll} itemsCount={groceryItems.length} mealsCount={mealIdeas.length} members={members} myMemberId={myMemberId} setMyMemberId={setMyMemberId} onExport={exportBackup} onImport={importBackup} session={session} familyInfo={familyInfo} />
         )}
       </main>
@@ -1465,7 +1484,7 @@ function App({ session }) {
         <MemberModal member={editingMember} onClose={() => { setShowAddMember(false); setEditingMember(null); }}
           onSave={(patch) => {
             if (editingMember) updateMember(editingMember.id, patch);
-            else addMember(patch.name, patch.phone, patch.kidMode);
+            else addMember(patch.name, patch.phone, patch.kidMode, patch.limitedMode);
             setShowAddMember(false); setEditingMember(null);
           }} />
       )}
@@ -3025,6 +3044,16 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
     setPushBusy(false);
   };
 
+  // Code parent : gardé seulement sur CET appareil (pas sur le serveur).
+  const [pinSaved, setPinSaved] = useState(() => !!lsGet("parentPin", ""));
+  const [newPin, setNewPin] = useState("");
+  const [pinMsg, setPinMsg] = useState("");
+  const savePin = () => {
+    if (!/^\d{4}$/.test(newPin)) { setPinMsg("❌ " + tr("lock.invalid")); return; }
+    lsSet("parentPin", newPin); setPinSaved(true); setNewPin(""); setPinMsg("✅ " + tr("lock.saved"));
+  };
+  const removePin = () => { lsSet("parentPin", ""); setPinSaved(false); setNewPin(""); setPinMsg("✅ " + tr("lock.removed")); };
+
   // Recharge les données depuis Supabase (l'ancien "backend" n'existe plus).
   const forceSync = async () => {
     setSyncing(true); setSyncResult("");
@@ -3212,6 +3241,22 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
       </button>
       </SettingsGroup>
 
+      <SettingsGroup title={tr("lock.group")} hint={tr("lock.groupHint")}>
+        <Card title={tr("lock.cardTitle")}>
+          <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0 }}>{tr("lock.help")}</p>
+          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{pinSaved ? "🔒 " + tr("lock.isSet") : tr("lock.isNotSet")}</p>
+          <label style={labelStyle}>{tr("lock.newCode")}</label>
+          <input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} value={newPin}
+            onChange={e => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            style={{ ...inputStyle, maxWidth: 170, letterSpacing: 6, textAlign: "center" }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={savePin} style={primaryBtn}>{tr("lock.save")}</button>
+            {pinSaved && <button type="button" onClick={removePin} style={outlineBtn}>{tr("lock.remove")}</button>}
+          </div>
+          {pinMsg && <p style={{ fontSize: 13, marginTop: 10 }}>{pinMsg}</p>}
+        </Card>
+      </SettingsGroup>
+
       <SettingsGroup title={tr("settings.groupData")} hint={tr("settings.groupDataHint")}>
       <Card title={tr("settings.deviceSync")}>
         <p style={{ fontSize: 12.5, color: COLORS.muted, marginTop: 0 }}>
@@ -3249,6 +3294,35 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
       </Card>
       </SettingsGroup>
     </div>
+  );
+}
+
+// Fenêtre du code parent : demandée quand on touche 5 fois le titre sur l'appareil d'un enfant.
+// Après 3 mauvais essais, on attend 30 secondes avant de pouvoir réessayer.
+function PinPrompt({ onClose, onSuccess }) {
+  const { t: tr } = useLanguage();
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [fails, setFails] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const submit = (e) => {
+    e.preventDefault();
+    if (Date.now() < lockedUntil) { setError(tr("lock.tooMany")); return; }
+    if (code === lsGet("parentPin", "")) { onSuccess(); return; }
+    const n = fails + 1;
+    setCode("");
+    if (n >= 3) { setFails(0); setLockedUntil(Date.now() + 30000); setError(tr("lock.tooMany")); }
+    else { setFails(n); setError(tr("lock.wrong")); }
+  };
+  return (
+    <ModalShell title={tr("lock.promptTitle")} onClose={onClose} onSubmit={submit}>
+      <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0 }}>{tr("lock.promptHelp")}</p>
+      <input autoFocus type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} value={code}
+        onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+        style={{ ...inputStyle, fontSize: 22, letterSpacing: 8, textAlign: "center" }} />
+      {error && <p style={{ color: "#B5715F", fontSize: 13, margin: "0 0 10px" }}>{error}</p>}
+      <button type="submit" style={primaryBtn}>{tr("lock.unlock")}</button>
+    </ModalShell>
   );
 }
 
@@ -3434,8 +3508,9 @@ function MemberModal({ member, onClose, onSave }) {
   const [name, setName] = useState(member?.name || "");
   const [phone, setPhone] = useState(member?.phone || "");
   const [kidMode, setKidMode] = useState(member?.kidMode || false);
+  const [limitedMode, setLimitedMode] = useState(member?.limitedMode || false);
   const [err, setErr] = useState("");
-  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr(tr("member.nameRequired")); return; } onSave({ name: name.trim(), phone: phone.trim(), kidMode }); };
+  const submit = (e) => { e.preventDefault(); if (!name.trim()) { setErr(tr("member.nameRequired")); return; } onSave({ name: name.trim(), phone: phone.trim(), kidMode, limitedMode: limitedMode && !kidMode }); };
   return (
     <ModalShell title={member ? tr("member.edit") : tr("member.add")} onClose={onClose} onSubmit={submit}>
       <label style={labelStyle}>{tr("member.firstName")}</label>
@@ -3454,6 +3529,17 @@ function MemberModal({ member, onClose, onSave }) {
           </span>
         </span>
       </label>
+      {!kidMode && (
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "#F0EAD8", borderRadius: 8, marginBottom: 14, cursor: "pointer" }}>
+          <input type="checkbox" checked={limitedMode} onChange={e => setLimitedMode(e.target.checked)} style={{ marginTop: 2 }} />
+          <span>
+            <span style={{ display: "block", fontSize: 13.5, fontWeight: 600, color: COLORS.ink }}>{tr("member.limitedAccess")}</span>
+            <span style={{ display: "block", fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+              {tr("member.limitedHelp")}
+            </span>
+          </span>
+        </label>
+      )}
       {err && <p style={{ color: COLORS.danger, fontSize: 12.5, marginBottom: 10 }}>{err}</p>}
       <button type="submit" style={{ ...primaryBtn, width: "100%", justifyContent: "center", padding: "12px 16px" }}><Check size={16} /> {member ? tr("action.save") : tr("action.add")}</button>
     </ModalShell>
