@@ -1528,6 +1528,10 @@ function PinCard({ children: c }) {
 // ---------- Semaine / Mois : repas + rendez-vous + tâches à prévoir ----------
 function ymdLocal(y, m, d) { return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`; }
 
+function daysBetweenStr(a, b) {
+  return Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
+
 function nextWeekdayOnOrAfter(dateStr, dow) {
   const d = new Date(dateStr + "T00:00:00");
   return addDays(dateStr, (dow - d.getDay() + 7) % 7);
@@ -1551,13 +1555,20 @@ function eventsForDate(date, appointments, tasks, members) {
     if (t.frequency === "unique") { show = !!t.dueDate && t.dueDate === date; done = !!t.lastDoneDate; }
     else if (t.frequency === "hebdomadaire") { show = hasDow && Number(t.dueDayOfWeek) === dow; done = t.lastDoneDate === date; }
     else if (t.frequency === "auxDeuxSemaines") {
-      if (t.lastDoneDate) show = date === addDays(t.lastDoneDate, 14);
-      else if (hasDow) show = date === nextWeekdayOnOrAfter(today, Number(t.dueDayOfWeek));
+      // Prochaine échéance (14 jours après la dernière fois, ou le prochain jour fixe),
+      // puis une projection toutes les 2 semaines. Une échéance en retard reste visible à sa date.
+      const base = t.lastDoneDate ? addDays(t.lastDoneDate, 14) : (hasDow ? nextWeekdayOnOrAfter(today, Number(t.dueDayOfWeek)) : null);
+      if (base) {
+        if (date === base) show = true;
+        else if (date > base && date >= today) show = daysBetweenStr(base, date) % 14 === 0;
+      }
     }
     if (show) dayTasks.push({ id: t.id, text: t.title, sub: nameOf(t.assignedTo), done });
   }
   return { appts, tasks: dayTasks };
 }
+
+const capFirst = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
 function EventChip({ icon, text, sub, done }) {
   return (
@@ -1619,8 +1630,8 @@ function Semaine({ weekDates, weekPlan, mealById, appointments, tasks, members, 
         {switcher}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <button onClick={() => shiftMonth(-1)} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronLeft size={16} color={COLORS.accentDark} /></button>
-          <button onClick={goToday} className="hand" style={{ fontSize: 20, background: "none", border: "none", color: COLORS.ink, cursor: "pointer", textTransform: "capitalize" }}>
-            {first.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+          <button onClick={goToday} className="hand" style={{ fontSize: 20, background: "none", border: "none", color: COLORS.ink, cursor: "pointer" }}>
+            {capFirst(first.toLocaleDateString(locale, { month: "long", year: "numeric" }))}
           </button>
           <button onClick={() => shiftMonth(1)} style={{ background: "#fff", border: "1.5px solid #D8D2BE", borderRadius: 8, padding: 8 }}><ChevronRight size={16} color={COLORS.accentDark} /></button>
         </div>
@@ -1656,8 +1667,8 @@ function Semaine({ weekDates, weekPlan, mealById, appointments, tasks, members, 
           <span><span style={{ color: DOT.task }}>●</span> {tr("nav.tasks")}</span>
         </div>
         <div style={{ background: COLORS.card, border: "1.5px solid #E7E0CE", borderRadius: 12, padding: 14 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, textTransform: "capitalize" }}>
-            {new Date(selected + "T00:00:00").toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })}
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
+            {capFirst(new Date(selected + "T00:00:00").toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" }))}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {selInfo.title && <EventChip icon="🍽" text={selInfo.title} />}
