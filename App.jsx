@@ -1288,6 +1288,17 @@ function App({ session }) {
   // petits) est plus strict et l'emporte s'il est coché aussi.
   const isLimitedLocked = !!(myMember && myMember.limitedMode && !myMember.kidMode) && !unlocked;
   const isKidDevice = !!(myMember && (myMember.kidMode || myMember.limitedMode));
+  // Un appareil d'enfant déverrouillé se reverrouille tout seul : quand l'app passe en
+  // arrière-plan, et après 10 minutes (au cas où on l'aurait laissé ouvert).
+  useEffect(() => {
+    if (!unlocked || !isKidDevice) return;
+    const relock = () => setUnlocked(false);
+    const onHide = () => { if (document.hidden) relock(); };
+    document.addEventListener("visibilitychange", onHide);
+    const timer = setTimeout(relock, 10 * 60 * 1000);
+    return () => { document.removeEventListener("visibilitychange", onHide); clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked, isKidDevice]);
   useEffect(() => {
     if (loaded && myMember?.kidMode && !unlocked) setTab("moi");
     else if (isKidDevice && (tab === "budget" || tab === "sante")) setTab("semaine");
@@ -1368,6 +1379,9 @@ function App({ session }) {
           </div>
           {!isKidLocked && !isLimitedLocked && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {isKidDevice && unlocked && (
+                <button onClick={() => setUnlocked(false)} style={{ ...outlineBtn, padding: "5px 10px", fontSize: 12 }}>🔒 {tr("lock.relock")}</button>
+              )}
               <button
                 type="button"
                 onClick={() => setLang(lang === "fr" ? "en" : "fr")}
@@ -3225,11 +3239,25 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
   const [pinSaved, setPinSaved] = useState(() => !!lsGet("parentPin", ""));
   const [newPin, setNewPin] = useState("");
   const [pinMsg, setPinMsg] = useState("");
+  const [currentPin, setCurrentPin] = useState("");
+  // Si un code existe déjà, il faut le saisir pour le changer ou le retirer.
+  const confirmCurrentPin = () => {
+    if (!pinSaved) return true;
+    const result = tryPin(currentPin);
+    setCurrentPin("");
+    if (result === "ok") return true;
+    setPinMsg("❌ " + (result === "locked" ? tr("lock.tryAgainIn").replace("{t}", formatWait(pinWaitMs())) : tr("lock.currentWrong")));
+    return false;
+  };
   const savePin = () => {
     if (!/^\d{4}$/.test(newPin)) { setPinMsg("❌ " + tr("lock.invalid")); return; }
+    if (!confirmCurrentPin()) return;
     lsSet("parentPin", newPin); setPinSaved(true); setNewPin(""); setPinMsg("✅ " + tr("lock.saved"));
   };
-  const removePin = () => { lsSet("parentPin", ""); setPinSaved(false); setNewPin(""); setPinMsg("✅ " + tr("lock.removed")); };
+  const removePin = () => {
+    if (!confirmCurrentPin()) return;
+    lsSet("parentPin", ""); setPinSaved(false); setNewPin(""); setPinMsg("✅ " + tr("lock.removed"));
+  };
 
   // Recharge les données depuis Supabase (l'ancien "backend" n'existe plus).
   const forceSync = async () => {
@@ -3438,6 +3466,14 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
         <Card title={tr("lock.cardTitle")}>
           <p style={{ fontSize: 13, color: COLORS.muted, marginTop: 0 }}>{tr("lock.help")}</p>
           <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{pinSaved ? "🔒 " + tr("lock.isSet") : tr("lock.isNotSet")}</p>
+          {pinSaved && (
+            <>
+              <label style={labelStyle}>{tr("lock.currentCode")}</label>
+              <input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} value={currentPin}
+                onChange={e => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                style={{ ...inputStyle, maxWidth: 170, letterSpacing: 6, textAlign: "center" }} />
+            </>
+          )}
           <label style={labelStyle}>{tr("lock.newCode")}</label>
           <input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4} value={newPin}
             onChange={e => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
@@ -3490,22 +3526,34 @@ function Params({ settings, onSave, onRefresh, onForcePush, itemsCount, mealsCou
   );
 }
 
+// Vérification du code parent. Les essais ratés sont comptés et gardés sur l'appareil :
+// fermer la fenêtre ou relancer l'app ne remet rien à zéro. Tous les 3 mauvais essais,
+// l'attente s'allonge (30 s, 2 min, 10 min, 30 min, puis 1 h), ce qui rend impossible
+// de deviner un code à 4 chiffres par essais répétés.
+const PIN_WAITS_MIN = [0.5, 2, 10, 30, 60];
+function pinWaitMs() { return Math.max(0, Number(lsGet("pinLockedUntil", 0)) - Date.now()); }
+function formatWait(ms) { const sec = Math.ceil(ms / 1000); return sec < 90 ? `${sec} s` : `${Math.ceil(sec / 60)} min`; }
+function tryPin(code) { // "ok" | "wrong" | "locked"
+  if (pinWaitMs() > 0) return "locked";
+  if (code === lsGet("parentPin", "")) { lsSet("pinFails", 0); lsSet("pinLockedUntil", 0); return "ok"; }
+  const n = Number(lsGet("pinFails", 0)) + 1;
+  lsSet("pinFails", n);
+  if (n % 3 === 0) lsSet("pinLockedUntil", Date.now() + PIN_WAITS_MIN[Math.min(n / 3 - 1, PIN_WAITS_MIN.length - 1)] * 60000);
+  return pinWaitMs() > 0 ? "locked" : "wrong";
+}
+
 // Fenêtre du code parent : demandée quand on touche 5 fois le titre sur l'appareil d'un enfant.
-// Après 3 mauvais essais, on attend 30 secondes avant de pouvoir réessayer.
 function PinPrompt({ onClose, onSuccess }) {
   const { t: tr } = useLanguage();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  const [fails, setFails] = useState(0);
-  const [lockedUntil, setLockedUntil] = useState(0);
   const submit = (e) => {
     e.preventDefault();
-    if (Date.now() < lockedUntil) { setError(tr("lock.tooMany")); return; }
-    if (code === lsGet("parentPin", "")) { onSuccess(); return; }
-    const n = fails + 1;
+    const result = tryPin(code);
     setCode("");
-    if (n >= 3) { setFails(0); setLockedUntil(Date.now() + 30000); setError(tr("lock.tooMany")); }
-    else { setFails(n); setError(tr("lock.wrong")); }
+    if (result === "ok") { onSuccess(); return; }
+    if (result === "locked") setError(tr("lock.tryAgainIn").replace("{t}", formatWait(pinWaitMs())));
+    else setError(tr("lock.wrong"));
   };
   return (
     <ModalShell title={tr("lock.promptTitle")} onClose={onClose} onSubmit={submit}>
